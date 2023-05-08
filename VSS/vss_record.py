@@ -22,6 +22,10 @@ if sys.version_info < (3, 9):
 
 from .vss_exception import EndOfBufferException, UnalignedReadException, RecordCrcException, RecordNotFoundException
 
+import datetime
+def timestamp_to_datetime(timestamp:int):
+	return datetime.datetime(1970, 1, 1) + datetime.timedelta(0, timestamp)
+
 class crc32:
 	# Make the CRC table
 	POLY=0xEDB88320
@@ -247,7 +251,8 @@ class vss_record_header:
 		return
 
 	def check_crc(self):
-		if not self.is_crc_valid():
+		# Comment record CRC always comes as 0
+		if self.signature != vss_comment_record.SIGNATURE and not self.is_crc_valid():
 			raise RecordCrcException("CRC error in %s record: expected=%04X, actual=%04X"
 							% (self.signature.decode(), self.file_crc, self.actual_crc))
 		return
@@ -259,11 +264,14 @@ class vss_record_header:
 
 	def print(self, fd):
 		# The signature is printed as if it'a a two-character literal: characters reversed
-		print("RECORD: '%c%c' - Length: 0x%X (%d) - Offset: %06X - CRC: %04X (%s: %04X)" % (
+		print_str = "RECORD: '%c%c' - Length: 0x%X (%d) - Offset: %06X" % (
 			chr(self.signature[1]), chr(self.signature[0]),
 			self.length + self.LENGTH, self.length + self.LENGTH,
-			self.offset, self.file_crc,
-			"valid" if self.is_crc_valid() else "INVALID", self.actual_crc), file=fd)
+			self.offset)
+		if self.signature != vss_comment_record.SIGNATURE:
+			print_str += " - CRC: %04X (%s: %04X)" % (
+				self.file_crc, "valid" if self.is_crc_valid() else "INVALID", self.actual_crc)
+		print(print_str, file=fd)
 		return
 
 class vss_record:
@@ -294,3 +302,134 @@ class vss_record:
 		if self.annotations:
 			print('\n'.join(self.annotations), file=fd)
 		return
+
+class vss_branch_record(vss_record):
+
+	SIGNATURE = b"BF"
+
+	def __init__(self, header:vss_record_header):
+		super().__init__(header)
+
+		self.prev_branch_offset:int = None
+		self.branch_file:bytes = None
+		return
+
+	def read(self):
+		super().read()
+
+		self.prev_branch_offset = self.reader.read_int32()
+		self.branch_file = self.reader.read_byte_string(12)
+		return
+
+	def print(self, fd):
+		super().print(fd)
+
+		print("  Prev branch offset: %06X" % (self.prev_branch_offset), file=fd)
+		print("  Branch file: %s" % (self.decode(self.branch_file)), file=fd)
+		return
+
+class vss_checkout_record(vss_record):
+
+	SIGNATURE = b"CF"
+
+	def __init__(self, header:vss_record_header):
+		super().__init__(header)
+
+		self.user : bytes = None
+		self.timestamp:int = None
+		self.working_dir:bytes = None
+		self.machine : bytes = None
+		self.project : bytes = None
+		self.comment : bytes = None
+		self.revision : int = None
+		self.flags : int = None
+		self.prev_checkout_offset : int = None
+		self.this_checkout_offset : int = None
+		self.checkouts : int = None
+		return
+
+	def read(self):
+		super().read()
+		reader = self.reader
+
+		self.user = reader.read_byte_string(32)
+		self.timestamp = reader.read_uint32()
+		self.working_dir = reader.read_byte_string(260)
+		self.machine = reader.read_byte_string(32)
+		self.project = reader.read_byte_string(260)
+		self.comment = reader.read_byte_string(64)
+		self.revision = reader.read_int16()
+		self.flags = reader.read_int16()
+		self.prev_checkout_offset = reader.read_int32()
+		self.this_checkout_offset = reader.read_int32()
+		self.checkouts = reader.read_int32()
+
+		return
+
+	def print(self, fd):
+		super().print(fd)
+
+		print("  User: %s @ %s" % (self.decode(self.user), timestamp_to_datetime(self.timestamp)), file=fd)
+		print("  Working: %s" % (self.decode(self.working_dir)), file=fd)
+		print("  Machine: %s" % (self.decode(self.machine)), file=fd)
+		print("  Project: %s" % (self.decode(self.project)), file=fd)
+		print("  Comment: %s" % (self.decode(self.comment)), file=fd)
+		print("  Revision: %3d" % (self.revision), file=fd)
+		print("  Flags: %4X%s" % (self.flags, " (exclusive)" if self.flags & 0x40 else ""), file=fd)
+		print("  Prev checkout offset: %06X" % (self.prev_checkout_offset), file=fd)
+		print("  This checkout offset: %06X" % (self.this_checkout_offset), file=fd)
+		print("  Checkouts: %d" % (self.checkouts), file=fd)
+		return
+
+def indent_string(src, indent:str) ->str:
+	return ('\n' + indent).join(src.rstrip().splitlines())
+
+class vss_comment_record(vss_record):
+
+	SIGNATURE = b"MC"
+
+	def __init__(self, header:vss_record_header):
+		super().__init__(header)
+		self.comment:str = None
+		return
+
+	def read(self):
+		super().read()
+
+		self.comment = self.reader.read_string(self.header.length)
+		return
+
+	def print(self, fd):
+		super().print(fd)
+
+		print("  Comment: %s" % (indent_string(self.comment, '           ')), file=fd)
+		return
+
+class vss_project_record(vss_record):
+
+	SIGNATURE = b"PF"
+
+	def __init__(self, header:vss_record_header):
+		super().__init__(header)
+
+		self.prev_project_offset:int = None
+		self.project_file:bytes = None
+		return
+
+	def read(self):
+		super().read()
+
+		self.prev_project_offset = self.reader.read_int32()
+		self.project_file = self.reader.read_byte_string(12)
+		return
+
+	def print(self, fd):
+		super().print(fd)
+
+		print("  Prev project offset: %06X" % (self.prev_project_offset), file=fd)
+		print("  Project file: %s" % (self.decode(self.project_file)), file=fd)
+		return
+
+class vss_delta_record(vss_record):
+
+	SIGNATURE = b"FD"

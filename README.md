@@ -40,6 +40,30 @@ class `vss_record`
 function `zero_terminated(src)`
 - return a copy of the `src` object truncated to the first zero byte.
 
+function `timestamp_to_datetime(timestamp:int)`
+- converts a 32 bit timestamp, as time since 00:00 of 01/01/1970 in seconds, into `datetime.datetime` object.
+
+class `vss_branch_record`
+- represents a record describing a branch of this file.
+Multiple branch records may be present, linked by `prev_branch_offset` field.
+
+class `vss_checkout_record`
+- represents a record describing the location and revision of a file checkout.
+VSS keeps track of checkouts to be able to merge the file changes onto the most recent version of the file.
+
+class `vss_comment_record`
+- represents a revision comment string. The string is stored zero-terminated.
+Unlike all other record types, its header doesn't contain a CRC, storing a zero instead.
+VSS allows to edit the comment after the fact.
+
+class `vss_project_record`
+- points to projects (directories) this file belongs to.
+A file can be cloned (shared) to multiple projects (directories).
+Multiple project records can be present, linked by `prev_project_offset` field.
+
+class `vss_delta_record`
+- represents delta (difference) of the previous revision of the file from the next revision.
+
 ### class `vss_record_reader`
 
 Class `vss_record_reader` defines the following methods:
@@ -192,3 +216,13 @@ The class has the following methods:
 `read_record(self, record_class, offset:int=None)`
 - reads the file record from the internal buffer at the given `offset` in the file, or at the current read position
 after the previous `read_record` call. The function returns a fully read object of `record_class`.
+
+## File `VSS/vss_revision_record.py`
+
+The file contains enum `VssRevisionAction` which describes codes for revision actions,
+and the base class `vss_revision_record` which describes the generic structure for a revision record.
+
+### class `vss_revision_record`
+
+The class defines fields for the base revision record (log entry),
+and the `read` function to read it from the record reader.
