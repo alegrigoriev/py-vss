@@ -325,3 +325,54 @@ and preloads the record dictionary with `vss_name_record` records.
 
 `get_name_record(self, name_offset)`
 - gets a name record of type `vss_name_record` from the dictionary by its offset in the file.
+
+## File `VSS/vss_item_file.py`
+
+The file implements classes to manage VSS item files. The item files contain information, including log entries, about projects (directories) and
+files in these directories.
+
+This file contains the following classes:
+
+class `vss_item_file`
+- a common class to manage item files;
+
+class `vss_project_item_file`
+- a class to manage project (directory) item file.
+
+class `vss_file_item_file`
+- a class to manage file item file.
+
+### class `vss_item_file`
+
+This is the base class for file and project item file classes. It has the following methods:
+
+`__init__(self, database, filename:str, header_record_class)`
+- constructor. Reads the file header of `header_record_class`, and then reads all records,
+using `vss_item_record_factory` record factory.
+
+`get_data_file_name(self)`
+- makes the data file name from its own filename and datafile extension taken from the header.
+The datafile extension is a single letter which alternates at every update to the data file.
+
+### class `vss_project_item_file`
+
+This class manages project item files, which store directory revisions. It has the following methods:
+
+`__init__(self, database, filename:str)`
+- constructor. Invokes vss_item_file constructor.
+
+`is_project(self)`
+- returns `True`.
+
+### class `vss_file_item_file`
+
+This class manages file item files, which store file revisions. It has the following methods:
+
+`__init__(self, database, filename:str)`
+- constructor. Invokes vss_item_file constructor.
+
+`is_project(self)`
+- returns `False`.
+
+`is_locked(self)`, `is_binary(self)`, `is_latest_only(self)`, `is_shared(self)`, `is_checked_out(self)`
+- return `True` or `False`, depending on flag set in the header.
