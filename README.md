@@ -140,6 +140,10 @@ See `struct.Strict` Python library documentation for the unpack format descripti
 or by a pre-compiled `struct.Struct` object. Current read offset is *not* advanced.
 See `struct.Struct` Python library documentation for the unpack format description.
 
+`read_name(self)`
+- reads a `vss_name` object, stored as 16 bit `flags`, 34 bytes zero-terminated name,
+32 bit `name_offset` - optional offset of additional short/long names.
+
 ### class `vss_record`
 
 It's a base class for all VSS file record classes. It contains the following methods:
@@ -266,7 +270,40 @@ since it's a class method.
 The file contains enum `VssRevisionAction` which describes codes for revision actions,
 and the base class `vss_revision_record` which describes the generic structure for a revision record.
 
+class `vss_revision_record_factory`
+- implements a record factory, which creates one of revision record classes based on the `action` field in the record.
+
 ### class `vss_revision_record`
 
 The class defines fields for the base revision record (log entry),
 and the `read` function to read it from the record reader.
+
+The following classes are derived from `vss_revision_record`:
+
+class `vss_label_revision_record`
+- encapsulates a record for label action.
+
+class `vss_common_revision_record`
+- encapsulates a record for several actions.
+The record contains additional logical and physical name of an item it refers to.
+
+class `vss_destroy_revision_record`
+- encapsulates a record for project or file destroy action.
+
+class `vss_rename_revision_record`
+- encapsulates a record for project or file rename action.
+
+class `vss_move_revision_record`
+- encapsulates a record for project or file destroy action.
+
+class `vss_share_revision_record`
+- encapsulates a record for a file share, pin and unpin action.
+
+class `vss_branch_revision_record`
+- encapsulates a record for file branch action.
+
+class `vss_checkin_revision_record`
+- encapsulates a record for file check-in action.
+
+class `vss_archive_restore_revision_record`
+- encapsulates a record for project or file archive or restore action.

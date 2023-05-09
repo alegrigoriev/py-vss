@@ -50,6 +50,19 @@ class crc32:
 			crc = (crc >> 8) ^ crc32.table[0xFF & (crc ^ data[i])];
 		return crc ^ final
 
+class vss_name:
+	unpack_format = struct.Struct(b'<H34sI')
+
+	def __init__(self, flags:int, short_name:bytes, name_file_offset:int):
+		self.flags:int = flags
+		# Short name can be empty
+		self.short_name:bytes = short_name
+		self.name_file_offset:int = name_file_offset
+		return
+
+	def is_project(self):
+		return 0 != (self.flags & 1)
+
 def zero_terminated(src):
 	zero_byte_pos = src.find(0)
 	if zero_byte_pos >= 0:
@@ -219,6 +232,11 @@ class vss_record_reader:
 		self.offset += size
 		return unpacked
 
+	def read_name(self):
+		flags, short_name, name_file_offset = self.unpack(vss_name.unpack_format)
+
+		return vss_name(flags, zero_terminated(short_name), name_file_offset)
+
 class vss_record_header:
 
 	LENGTH = 8
@@ -295,6 +313,17 @@ class vss_record:
 		else:
 			self.annotations = [annotation]
 		return
+
+	def decode_name(self, name:vss_name, physical_name=None):
+		if not name.short_name:
+			s = '""'
+		else:
+			s = self.decode(name.short_name)
+		if name.name_file_offset:
+			s += ' (name_offset: %X)' % (name.name_file_offset, )
+		if physical_name:
+			s += ' (%s)' % (self.decode(physical_name))
+		return s
 
 	def print(self, fd):
 		self.header.print(fd)

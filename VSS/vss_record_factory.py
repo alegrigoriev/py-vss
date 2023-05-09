@@ -19,7 +19,7 @@ from .vss_record import (
 	vss_project_record,
 	vss_branch_record,
 	vss_delta_record)
-from .vss_revision_record import vss_revision_record
+from .vss_revision_record import vss_revision_record, vss_revision_record_factory
 
 class vss_item_record_factory:
 	class_dict = {
@@ -27,7 +27,7 @@ class vss_item_record_factory:
 			vss_checkout_record.SIGNATURE : vss_checkout_record,
 			vss_project_record.SIGNATURE : vss_project_record,
 			vss_branch_record.SIGNATURE : vss_branch_record,
-			vss_revision_record.SIGNATURE : vss_revision_record,
+			vss_revision_record.SIGNATURE : vss_revision_record_factory,
 			vss_delta_record.SIGNATURE : vss_delta_record,
 		}
 
