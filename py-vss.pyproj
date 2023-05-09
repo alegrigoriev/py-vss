@@ -25,6 +25,7 @@
     <Compile Include="VSS\vss_database.py" />
     <Compile Include="VSS\vss_record_file.py" />
     <Compile Include="VSS\vss_revision_record.py" />
+    <Compile Include="VSS\vss_record_factory.py" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="LICENSE" />

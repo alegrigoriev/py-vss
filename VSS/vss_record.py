@@ -303,6 +303,14 @@ class vss_record:
 			print('\n'.join(self.annotations), file=fd)
 		return
 
+	@classmethod
+	def create_record(cls, record_header)->vss_record:
+		return cls(record_header)
+
+	@classmethod
+	def valid_record_class(cls, record):
+		return type(record) is cls
+
 class vss_branch_record(vss_record):
 
 	SIGNATURE = b"BF"

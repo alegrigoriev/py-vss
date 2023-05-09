@@ -157,6 +157,14 @@ The base class does nothing; derived classes read fields of their actual records
 - The function prints the record data to `fd` file object as text formatted lines.
 The base class only calls `self.header.print(fd)` to print the record header.
 
+`classmethod create_record(record_class_factory, record_header)`
+- This class method can be called to create a record class instance based on the given `record_header`.
+The default implementation only uses `record_class_factory` as the class to create an instance.
+
+`classmethod valid_record_class(record_class_factory, record)`
+- This class method can be called to validate the `record` is a valid record class instance created by `record_class_factory`.
+The default implementation only checks that `record` is an instance of `record_class_factory`.
+
 ## File `VSS/vss_database.py`
 
 File `VSS/vss_database.py` contains the following classes:
@@ -213,9 +221,45 @@ The class has the following methods:
 - the constructor opens the given file by its filename and the optional `first_letter_subdirectory`
 (see `vss_database.get_data_path` for its meaning), and reads all its data into an internal buffer.
 
-`read_record(self, record_class, offset:int=None)`
-- reads the file record from the internal buffer at the given `offset` in the file, or at the current read position
-after the previous `read_record` call. The function returns a fully read object of `record_class`.
+`read_record(self, record_factory, offset:int=None, ignore_unknown:bool=False)`
+- reads the file record from the internal buffer at the given `offset` in the file,
+or at the current read position after the previous `read_record` call.
+
+	The function calls `create_record` method of `record_factory` which returns an object of some record class.
+	If `record_factory` doesn't recognize this record type/signature, the function either returns `None`
+	if `ignore_unknown` is `True`, or raises `UnrecognizedRecordException` otherwise.
+
+`read_all_records(self, record_factory, offset=None, last_offset=None, ignore_unknown:bool=False)`
+- reads all records, using `record_factory` to create the record objects, and stores them in a dictionary
+by the record offset.
+Optional argument `offset` specified the file offset to start the reading.
+Optional argument `last_offset` specifies the file offset to stop the reading.  
+The function returns an iterator for all read record objects in the file order.
+
+`get_record(self, offset:int, record_class=None)`
+- get a previously read record object from the dictionary by its offset.
+An optional `record_class` argument can be provided, to validate the record belonging to the class.
+
+## File `VSS/vss_record_factory.py`
+
+The file implements class `vss_item_record_factory`, which is used to read records of a VSS item file
+and create objects of record class based on the record signature.
+
+### class `vss_item_record_factory`
+
+The class implements two factory methods:
+
+`classmethod create_record(cls, record_header)`
+- This static method is called to create a record class instance based on the given `record_header`.
+The class implementation creates one of `vss_comment_record`, `vss_checkout_record`, `vss_project_record`,
+`vss_branch_record`, `vss_revision_record`, `vss_delta_record` objects, based on `record_header.signature`.  
+Note that `cls` argument when this function is called is `vss_item_record_factory`,
+since it's a class method.
+
+`classmethod valid_record_class(cls, record)`
+- This static method is called to validate the `record` is a valid record class instance created by this factory class.
+Note that `cls` argument when this function is called is `vss_item_record_factory`,
+since it's a class method.
 
 ## File `VSS/vss_revision_record.py`
 
