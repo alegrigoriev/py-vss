@@ -23,6 +23,7 @@
     <Compile Include="VSS\vss_exception.py" />
     <Compile Include="VSS\vss_record.py" />
     <Compile Include="VSS\vss_database.py" />
+    <Compile Include="VSS\vss_record_file.py" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="LICENSE" />

@@ -13,6 +13,8 @@
 #   limitations under the License.
 
 from __future__ import annotations
+from typing import DefaultDict
+
 from .vss_exception import VssFileNotFoundException
 
 import re
@@ -54,6 +56,8 @@ class vss_database:
 		data_path = ini_reader.get("Data_Path", "data")
 		self.data_path = Path(path, data_path)
 
+		self.record_files_by_physical:DefaultDict[str,vss_record_file] = {}
+
 		return
 
 	def get_data_path(self, physical_name, first_letter_subdirectory=True):
@@ -70,6 +74,23 @@ class vss_database:
 					first_letter_subdirectory=first_letter_subdirectory), 'rb')
 		except FileNotFoundError as fnf:
 			raise VssFileNotFoundException("VSS: %s %s" % (fnf.strerror, fnf.filename))
+
+	# Item files can be shared for shared files.
+	# Maintain a dictionary for them
+	def open_records_file(self, file_class, physical_name, first_letter_subdirectory=False):
+		file = self.record_files_by_physical.get(physical_name, None)
+		if file is NotImplemented:
+			raise VssFileNotFoundException("VSS: File not found %s" %
+					(self.get_data_path(physical_name, first_letter_subdirectory=first_letter_subdirectory)))
+		if file is not None:
+			return file
+
+		# Prevent recursion loop:
+		self.record_files_by_physical[physical_name] = NotImplemented
+
+		file = file_class(self, physical_name, first_letter_subdirectory)
+		self.record_files_by_physical[physical_name] = file
+		return file
 
 	def print(self, fd):
 		print('Database:', self.base_path, file=fd)

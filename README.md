@@ -172,3 +172,23 @@ For all  other files located immediately under `data`, `first_letter_subdirector
 `open_data_file(self, physical_name, first_letter_subdirectory=True)`
 - returns a file object for the given file.
 If the file is not present, the function raises an exception `VssFileNotFoundException`.
+
+`open_records_file(self, file_class, physical_name, first_letter_subdirectory=False)`
+- returns a new object of the class `file_class` (usually derived from `vss_record_file`),
+or returns an existing one from cache for the given `physical_name`.
+
+## File `VSS/vss_record_file.py`
+
+The file implements class `vss_record_file`.
+
+### class `vss_record_file`
+
+The class has the following methods:
+
+`__init__(self, database:vss_database, filename:str, first_letter_subdirectory=True)`
+- the constructor opens the given file by its filename and the optional `first_letter_subdirectory`
+(see `vss_database.get_data_path` for its meaning), and reads all its data into an internal buffer.
+
+`read_record(self, record_class, offset:int=None)`
+- reads the file record from the internal buffer at the given `offset` in the file, or at the current read position
+after the previous `read_record` call. The function returns a fully read object of `record_class`.
