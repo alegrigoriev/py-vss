@@ -132,3 +132,43 @@ The base class does nothing; derived classes read fields of their actual records
 `print(self, fd)`
 - The function prints the record data to `fd` file object as text formatted lines.
 The base class only calls `self.header.print(fd)` to print the record header.
+
+## File `VSS/vss_database.py`
+
+File `VSS/vss_database.py` contains the following classes:
+
+class `simple_ini_parser`
+- implements a parser for `srcsafe.ini` file. Unlike common INI file format, `srcsafe.ini` file doesn't have sections.
+
+class `vss_database`
+- implements upper level functions of VSS database (repository).
+
+### class `simple_ini_parser`
+
+The class constructor takes the INI file pathname as its only argument.
+
+The class method `get(key, default)` returns the value stored by the given `key`,
+or the `default` value, if the key is not present in the file.
+
+### class `vss_database`
+
+The class defines the following methods:
+
+`__init__(self, path:str, encoding='mbcs')`
+- constructor, which takes the path to the repository root directory,
+and an optional `encoding` argument, to specify locale or encoding for filenames in the repository.
+VSS always uses the local ANSI code page, which is `mbcs` (Multi-Byte Character Set) encoding.
+
+`get_data_path(self, physical_name, first_letter_subdirectory=True)`
+- returns the full path for a database file, built from its `physical name`.
+The database files are usually located under `data/` subdirectory,
+which can be changed by the `Data_Path` value in the INI file.
+
+Metadata and data files with 8-letter names and an optional single-letter extension
+are located under a single-letter subdirectory under `data`.
+For such files, `first_letter_subdirectory` argument should be left at `True`.
+For all  other files located immediately under `data`, `first_letter_subdirectory` argument needs to be explicitly set as `False`.
+
+`open_data_file(self, physical_name, first_letter_subdirectory=True)`
+- returns a file object for the given file.
+If the file is not present, the function raises an exception `VssFileNotFoundException`.
