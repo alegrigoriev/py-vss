@@ -28,6 +28,7 @@
     <Compile Include="VSS\vss_record_factory.py" />
     <Compile Include="VSS\vss_name_file.py" />
     <Compile Include="VSS\vss_item_file.py" />
+    <Compile Include="VSS\vss_item.py" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="LICENSE" />

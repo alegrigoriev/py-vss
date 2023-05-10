@@ -213,6 +213,17 @@ If the file is not present, the function raises an exception `VssFileNotFoundExc
 - returns a new object of the class `file_class` (usually derived from `vss_record_file`),
 or returns an existing one from cache for the given `physical_name`.
 
+`get_long_name(self, name)`
+- make a long (full) name from an object of `vss_name` type, which contains an optional offset in the name file for a name record.
+`vss_name` object read from a file can only have names up to 34 bytes long.
+
+`open_root_project(self, project_class, recursive=False)`
+- opens the root project as the instance of class `project_class` (usually`vss_project`).
+If `recursive`, then the whole project tree is built.
+
+`get_project_tree(self)`
+- return the project tree of `vss_project` type.
+
 ## File `VSS/vss_record_file.py`
 
 The file implements class `vss_record_file`.
@@ -376,3 +387,59 @@ This class manages file item files, which store file revisions. It has the follo
 
 `is_locked(self)`, `is_binary(self)`, `is_latest_only(self)`, `is_shared(self)`, `is_checked_out(self)`
 - return `True` or `False`, depending on flag set in the header.
+
+## File `VSS/vss_item.py`
+
+The file contains classes to represent logical items: projects (directories) and files in those
+projects.
+
+The following classes are defined:
+
+class `vss_item`
+- common base class for project item and file item;
+
+class `vss_project`
+- a class to manage logical directory (project).
+
+class `vss_file`
+- a class to manage a logical file.
+
+### class `vss_item`
+
+The class is used only to derive `vss_project` and `vss_file` classes. It implements the following methods:
+
+`__init__(self, database:vss_database, item_file_class, physical_name:str, logical_name:str, flags:int)`
+- constructor.
+
+`is_deleted(self)`
+- return `True` if the item marked as deleted. In VSS, items are not purged from a directory, unless deleted permanently.
+
+`make_full_path(self, sub_item_name:str='')`
+- return the full path for a sub-item of this item.
+
+### class `vss_project`
+
+The class is derived from `vss_item` and implements the following methods:
+
+`__init__(self, database:vss_database, physical_name:str, logical_name:str, flags:int, recursive=True)`
+- constructor. If `recursive`, also creates the sub-items (projects and files).
+
+`is_project(self)`
+- returns `True`.
+
+`all_items(self)`
+- returns an iterator of all child items (projects and files).
+
+### class `vss_file`
+
+The class is derived from `vss_item` and implements the following methods:
+
+`__init__(self, database:vss_database, physical_name:str, logical_name:str, flags:int, pinned_version:int=0)`
+- constructor.
+
+`is_project(self)`
+- returns `False`.
+
+`is_pinned(self)`, `is_locked(self)`, `is_binary(self)`, `is_latest_only(self)`, `is_shared(self)`, `is_checked_out(self)`
+- Returns flags state of its item file.
+

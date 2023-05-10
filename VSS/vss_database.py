@@ -64,6 +64,14 @@ class vss_database:
 
 		return
 
+	def open_root_project(self, project_class, recursive=False):
+		return project_class(self, self.RootProjectFile, self.RootProjectName, 0, recursive=recursive)
+
+	def get_project_tree(self):
+		# In-method imports are used to prevent circular dependencies
+		from .vss_item import vss_project
+		return self.open_root_project(vss_project, recursive=True)
+
 	def get_data_path(self, physical_name, first_letter_subdirectory=True):
 		if first_letter_subdirectory:
 			# Data files are arranged into directories by the first letter of their name
@@ -96,7 +104,17 @@ class vss_database:
 		self.record_files_by_physical[physical_name] = file
 		return file
 
+	def get_long_name(self, name:vss_name):
+		if name.name_file_offset == 0:
+			return name.short_name
+
+		name_record = self.name_file.get_name_record(name.name_file_offset)
+		return name_record.get(
+					name_record.NameKind.Project if name.is_project() else name_record.NameKind.Long,
+					name.short_name)
+
 	def print(self, fd):
 		print('Database:', self.base_path, file=fd)
 
+		self.get_project_tree().print(fd)
 		return
