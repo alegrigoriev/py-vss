@@ -58,6 +58,10 @@ class vss_database:
 
 		self.record_files_by_physical:DefaultDict[str,vss_record_file] = {}
 
+		# In-method imports are used to prevent circular dependencies
+		from .vss_name_file import vss_name_file
+		self.name_file = vss_name_file(self, "names.dat")
+
 		return
 
 	def get_data_path(self, physical_name, first_letter_subdirectory=True):

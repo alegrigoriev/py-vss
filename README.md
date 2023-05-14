@@ -307,3 +307,21 @@ class `vss_checkin_revision_record`
 
 class `vss_archive_restore_revision_record`
 - encapsulates a record for project or file archive or restore action.
+
+## File `VSS/vss_name_file.py`
+
+The file implements class `vss_name_file` along with record classes used in the name file.
+
+### class `vss_name_file`
+
+This class manages the VSS name file, which contains records to store various flavors of
+file names, when the default reserved length 34 bytes for a name is insufficient.
+
+It implements the following methods:
+
+`__init__(self, database:vss_database, filename:str)`
+- constructor. Opens the file by its filename (default `names.dat`) under `data/` database directory,
+and preloads the record dictionary with `vss_name_record` records.
+
+`get_name_record(self, name_offset)`
+- gets a name record of type `vss_name_record` from the dictionary by its offset in the file.
