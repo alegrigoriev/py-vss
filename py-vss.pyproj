@@ -30,6 +30,7 @@
     <Compile Include="VSS\vss_item_file.py" />
     <Compile Include="VSS\vss_item.py" />
     <Compile Include="VSS\vss_revision.py" />
+    <Compile Include="VSS\vss_action.py" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="LICENSE" />

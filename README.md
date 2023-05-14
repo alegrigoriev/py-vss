@@ -561,3 +561,49 @@ The base class function only returns same `data` blob.
 `print(self, fd)`
 - The function prints the revision data to `fd` file object as text formatted lines.
 The base class prints a generic revision header.
+
+## File `VSS/vss_action.py`
+
+The file contains class `vss_action` and various action-specific classes derived from it.
+
+The file exports `create_file_action` and `create_project_action` functions,
+which returns an action object of a class specific to the given revision action.
+
+### class `vss_action`
+
+This is the base class for all action classes. It defines the following class data items:
+
+`ACTION_STR`
+- a base string for building a human-readable action description.
+
+`project_action`
+- `True` for project action classes, `False` for file action classes.
+
+The base class sets both to `NotImplemented`.
+
+It also defines the following methods:
+
+`__init__(self, revision:vss_revision, base_path:str, name:str='')`
+- constructor. `base_path` provides the path name of a directory which contains this action.
+
+`add_error_string(self, error_str)`
+- adds the given error string to a list in this object, to be emitted to the actions log.
+
+`__str__(self)`
+- returns a string describing this action. The default implementation combines `ACTION_STR` and file name into a string.
+
+### class `vss_named_action`
+
+This class is derived from `vss_action` and provides a base class for various actions.
+
+This class redefines the constructor as: `__init__(self, revision:vss_revision, base_path:str)`.
+
+### Function `create_file_action`
+
+This function, defined as `create_file_action(revision, base_path)` is an action factory,
+which returns an action object of a specific class for the given `revision`.
+
+### Function `create_project_action`
+
+This function, defined as `create_project_action(revision, base_path)` is an action factory,
+which returns an action object of a specific class for the given `revision`.
