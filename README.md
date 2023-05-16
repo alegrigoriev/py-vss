@@ -161,9 +161,9 @@ Constructors for all derived classes should have the `header` argument.
 - The function reads the record, using `self.reader`.
 The base class does nothing; derived classes read fields of their actual records.
 
-`print(self, fd)`
+`print(self, fd, indent:str='')`
 - The function prints the record data to `fd` file object as text formatted lines.
-The base class only calls `self.header.print(fd)` to print the record header.
+The base class only calls `self.header.print(fd, indent)` to print the record header.
 
 `classmethod create_record(record_class_factory, record_header)`
 - This class method can be called to create a record class instance based on the given `record_header`.
@@ -558,7 +558,7 @@ and saves the returned item index.
 The base class function only returns same `data` blob.
 `vss_checkin_revision` applies the delta record to the blob to produce the blob for previous revision.
 
-`print(self, fd)`
+`print(self, fd, indent:str='')`
 - The function prints the revision data to `fd` file object as text formatted lines.
 The base class prints a generic revision header.
 

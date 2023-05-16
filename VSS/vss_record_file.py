@@ -89,11 +89,11 @@ class vss_record_file:
 					% (offset, self.filename, record_class.__name__, type(record).__name__))
 		return record
 
-	def print(self, fd):
+	def print(self, fd, indent:str=''):
 		if self.header is not None:
-			print("Header:", file=fd)
-			self.header.print(fd)
+			print(indent + "Header:", file=fd)
+			self.header.print(fd, indent+'  ')
 
 		for record in self.records.values():
-			record.print(fd)
+			record.print(fd, indent)
 		return

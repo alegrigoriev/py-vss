@@ -84,10 +84,10 @@ class vss_item:
 
 		return sub_item_name
 
-	def print(self, fd):
-		print("  Entry flags=%s" % (ProjectEntryFlag(self.flags)), file=fd)
+	def print(self, fd, indent:str=''):
+		print("%sEntry flags=%s" % (indent, ProjectEntryFlag(self.flags)), file=fd)
 
-		self.item_file.print(fd)
+		self.item_file.print(fd, indent)
 		return
 
 class vss_project_entry_record(vss_record):
@@ -121,13 +121,13 @@ class vss_project_entry_record(vss_record):
 		self.physical = reader.read_byte_string(10)
 		return
 
-	def print(self, fd):
-		super().print(fd)
+	def print(self, fd, indent:str=''):
+		super().print(fd, indent)
 
-		print("  Item Type: %d - Name: %s"
-					% (self.item_type, self.decode_name(self.name, self.physical)), file=fd)
-		print("  Flags: %4X (%s)" % (self.flags, ProjectEntryFlag(self.flags)), file=fd)
-		print("  Pinned version: %d" % (self.pinned_version), file=fd)
+		print("%sItem Type: %d - Name: %s"
+					% (indent, self.item_type, self.decode_name(self.name, self.physical)), file=fd)
+		print("%sFlags: %4X (%s)" % (indent, self.flags, ProjectEntryFlag(self.flags)), file=fd)
+		print("%sPinned version: %d" % (indent, self.pinned_version), file=fd)
 		return
 
 class vss_file(vss_item):
@@ -160,11 +160,11 @@ class vss_file(vss_item):
 	def is_checked_out(self):
 		return self.item_file.is_checked_out()
 
-	def print(self, fd):
-		print("\nFile %s" % (self.make_full_path()), file=fd)
-		print("  File flags=%s" % (FileHeaderFlags(self.item_file.header.flags)), file=fd)
+	def print(self, fd, indent=''):
+		print("\n%sFile %s" % (indent, self.make_full_path()), file=fd)
+		print("%s  File flags=%s" % (indent, FileHeaderFlags(self.item_file.header.flags)), file=fd)
 
-		super().print(fd)
+		super().print(fd, indent+'  ')
 		return
 
 class vss_project(vss_item):
@@ -294,12 +294,13 @@ class vss_project(vss_item):
 	def get_item_by_logical_name(self, logical_name:str)->vss_item:
 		return self.items_by_logical_name.get(logical_name, None)
 
-	def print(self, fd):
-		print("\nProject %s" % (self.make_full_path()), file=fd)
+	def print(self, fd, indent:str=''):
+		print("\n%sProject %s" % (indent, self.make_full_path()), file=fd)
 
-		super().print(fd)
+		indent += '  '
+		super().print(fd, indent)
 
 		# Print child items
 		for item in self.all_items():
-			item.print(fd)
+			item.print(fd, indent)
 		return

@@ -62,11 +62,11 @@ class vss_item_file_header:
 		# Total 52 bytes read (0x34)
 		return
 
-	def print(self, fd):
-		print("  File type: %s, version: %d" %
-			('Project' if self.file_type == ItemFileType.Project else 'File', self.file_version), file=fd)
+	def print(self, fd, indent=''):
+		print("%sFile type: %s, version: %d" %
+			(indent, 'Project' if self.file_type == ItemFileType.Project else 'File', self.file_version), file=fd)
 		if any(self.filler_words):
-			print("  Filler: %08X %08X %08X %08X" % self.filler_words, file=fd)
+			print("%sFiller: %08X %08X %08X %08X" % (indent, *self.filler_words), file=fd)
 		return
 
 class vss_item_header_record(vss_record):
@@ -111,23 +111,23 @@ class vss_item_header_record(vss_record):
 			self.item_header_filler_words = None
 		return
 
-	def print(self, fd):
-		super().print(fd)
+	def print(self, fd, indent:str=''):
+		super().print(fd, indent)
 
-		print("  Item Type: %s - Revisions: %d - Name: %s" % (
+		print("%sItem Type: %s - Revisions: %d - Name: %s" % (indent,
 						'Project' if self.item_type == ItemFileType.Project else 'File',
 						self.num_revisions, self.decode(self.name.short_name)), file=fd)
 		if self.name.name_file_offset != 0:
-			print("  Name offset: %06X" % (self.name.name_file_offset), file=fd)
-		print("  First revision: #%3d" % (self.first_revision), file=fd)
+			print("%sName offset: %06X" % (indent, self.name.name_file_offset), file=fd)
+		print("%sFirst revision: #%3d" % (indent, self.first_revision), file=fd)
 		if self.data_ext:
-			print("  Data extension: %s" % (self.data_ext.decode()), file=fd)
-		print("  First/last rev offset: %06X/%06X" % (self.first_revision_offset, self.last_revision_offset), file=fd)
-		print("  EOF offset: %06X" % (self.eof_offset), file=fd)
+			print("%sData extension: %s" % (indent, self.data_ext.decode()), file=fd)
+		print("%sFirst/last rev offset: %06X/%06X" % (indent, self.first_revision_offset, self.last_revision_offset), file=fd)
+		print("%sEOF offset: %06X" % (indent, self.eof_offset), file=fd)
 		if self.rights_offset != 0:
-			print("  Rights offset: %06X" % (self.rights_offset), file=fd)
+			print("%sRights offset: %06X" % (indent, self.rights_offset), file=fd)
 		if self.item_header_filler_words is not None:
-			print("  Filler: %08X %08X %08X %08X" % self.item_header_filler_words, file=fd)
+			print("%sFiller: %08X %08X %08X %08X" % (indent, *self.item_header_filler_words), file=fd)
 		return
 
 class FileHeaderFlags(IntFlag):
@@ -205,24 +205,24 @@ class vss_file_header_record(vss_item_header_record):
 		self.creation_timestamp = reader.read_uint32()
 		return
 
-	def print(self, fd):
-		super().print(fd)
+	def print(self, fd, indent:str=''):
+		super().print(fd, indent)
 
-		print("  Flags: %4X (%s)" % (self.flags, FileHeaderFlags(self.flags)), file=fd)
+		print("%sFlags: %4X (%s)" % (indent, self.flags, FileHeaderFlags(self.flags)), file=fd)
 		if self.branch_file:
-			print("  Branched from file: %s" % (self.branch_file), file=fd)
+			print("%sBranched from file: %s" % (indent, self.branch_file), file=fd)
 		if self.branch_offset != 0:
-			print("  Branch offset: %06X" % (self.branch_offset), file=fd)
-		print("  Branch count: %d" % (self.branch_count), file=fd)
-		print("  Project offset: %06X" % (self.project_offset), file=fd)
-		print("  Project count: %d" % (self.project_count), file=fd)
-		print("  First/last checkout offset: %06X/%06X" % (self.first_checkout_offset, self.last_checkout_offset), file=fd)
-		print("  Data CRC: %8X" % (self.data_crc), file=fd)
-		print("  Last revision time: %s" % (timestamp_to_datetime(self.last_rev_timestamp)), file=fd)
-		print("  Modification time: %s" % (timestamp_to_datetime(self.modification_timestamp)), file=fd)
-		print("  Creation time: %s" % (timestamp_to_datetime(self.creation_timestamp)), file=fd)
+			print("%sBranch offset: %06X" % (indent, self.branch_offset), file=fd)
+		print("%sBranch count: %d" % (indent, self.branch_count), file=fd)
+		print("%sProject offset: %06X" % (indent, self.project_offset), file=fd)
+		print("%sProject count: %d" % (indent, self.project_count), file=fd)
+		print("%sFirst/last checkout offset: %06X/%06X" % (indent, self.first_checkout_offset, self.last_checkout_offset), file=fd)
+		print("%sData CRC: %8X" % (indent, self.data_crc), file=fd)
+		print("%sLast revision time: %s" % (indent, timestamp_to_datetime(self.last_rev_timestamp)), file=fd)
+		print("%sModification time: %s" % (indent, timestamp_to_datetime(self.modification_timestamp)), file=fd)
+		print("%sCreation time: %s" % (indent, timestamp_to_datetime(self.creation_timestamp)), file=fd)
 		if self.file_header_filler_words is not None:
-			print("  Filler: %08X %08X" % self.file_header_filler_words, file=fd)
+			print("%sFiller: %08X %08X" % (indent, *self.file_header_filler_words), file=fd)
 		return
 
 class vss_project_header_record(vss_item_header_record):
@@ -246,13 +246,13 @@ class vss_project_header_record(vss_item_header_record):
 		self.subprojects = reader.read_int16()
 		return
 
-	def print(self, fd):
-		super().print(fd)
+	def print(self, fd, indent:str=''):
+		super().print(fd, indent)
 
-		print("  Parent project: %s" % (self.parent_project), file=fd)
-		print("  Parent file: %s" % (self.parent_file), file=fd)
-		print("  Total items: %d" % (self.total_items), file=fd)
-		print("  Subprojects: %d" % (self.subprojects), file=fd)
+		print("%sParent project: %s" % (indent, self.parent_project), file=fd)
+		print("%sParent file: %s" % (indent, self.parent_file), file=fd)
+		print("%sTotal items: %d" % (indent, self.total_items), file=fd)
+		print("%sSubprojects: %d" % (indent, self.subprojects), file=fd)
 		return
 
 class vss_item_file(vss_record_file):
@@ -284,14 +284,14 @@ class vss_item_file(vss_record_file):
 	def get_last_revision_num(self):
 		return self.header.num_revisions
 
-	def print(self, fd):
+	def print(self, fd, indent:str=''):
 
-		print("Item file %s, size: %06X" % (self.filename, self.file_size), file=fd)
-		super().print(fd)
+		print("%sItem file %s, size: %06X" % (indent, self.filename, self.file_size), file=fd)
+		super().print(fd, indent + '  ')
 
 		for revision in self.revisions:
 			print('', file=fd)	# insert an empty line
-			revision.print(fd)
+			revision.print(fd, indent)
 		return
 
 class vss_project_item_file(vss_item_file):
@@ -496,8 +496,8 @@ class vss_file_item_file(vss_item_file):
 			return b''
 		return revision.revision_data
 
-	def print(self, fd):
-		super().print(fd)
+	def print(self, fd, indent:str=''):
+		super().print(fd, indent)
 
 		crc = crc32.calculate(self.last_data)
 		if crc != self.header.data_crc:
@@ -505,31 +505,31 @@ class vss_file_item_file(vss_item_file):
 
 		offset = self.header.project_offset
 		if offset != 0:
-			print("\nIncluded in %d project(s):" % (self.header.project_count), file=fd)
+			print("\n%sIncluded in %d project(s):" % (indent, self.header.project_count), file=fd)
 			while offset != 0:
 				# Note that the project count may be less than number of records
 				# Because some projects may be inactive at this time
 				project_record = self.get_record(offset, vss_project_record)
 				print('', file=fd)
-				project_record.print(fd)
+				project_record.print(fd, indent + '  ')
 				offset = project_record.prev_project_offset
 
 		offset = self.header.branch_offset
 		if offset != 0:
-			print("\nBranched to %d project(s):" % (self.header.branch_count), file=fd)
+			print("\n%sBranched to %d project(s):" % (indent, self.header.branch_count), file=fd)
 			while offset != 0:
 				branch_record = self.get_record(offset, vss_branch_record)
 				print('', file=fd)
-				branch_record.print(fd)
+				branch_record.print(fd, indent + '  ')
 				offset = branch_record.prev_branch_offset
 
 		offset = self.header.last_checkout_offset
 		if offset != 0:
-			print("\nChecked out to:", file=fd)
+			print("\n%sChecked out to:" % (indent), file=fd)
 			while offset != 0:
 				checkout_record = self.get_record(offset, vss_checkout_record)
 				print('', file=fd)
-				checkout_record.print(fd)
+				checkout_record.print(fd, indent + '  ')
 				if offset == self.header.first_checkout_offset:
 					break
 				offset = checkout_record.prev_checkout_offset

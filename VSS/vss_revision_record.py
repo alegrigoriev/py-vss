@@ -93,28 +93,28 @@ class vss_revision_record(vss_record):
 		self.label = zero_terminated(label)
 		return
 
-	def print(self, fd):
-		super().print(fd)
+	def print(self, fd, indent:str=''):
+		super().print(fd, indent)
 
-		print("Revision: %d" % (self.revision_num), file=fd)
-		print("  By: '%s', at: %s (%d)" % (self.decode(self.user), timestamp_to_datetime(self.timestamp), self.timestamp), file=fd)
-		print("  %s (%d)" % (VssRevisionAction(self.action), self.action), file=fd)
-		print("  Prev rev offset: %06X" % (self.prev_rev_offset), file=fd)
+		print("%sRevision: %d" % (indent, self.revision_num), file=fd)
+		print("%sBy: '%s', at: %s (%d)" % (indent, self.decode(self.user), timestamp_to_datetime(self.timestamp), self.timestamp), file=fd)
+		print("%s%s (%d)" % (indent, VssRevisionAction(self.action), self.action), file=fd)
+		print("%sPrev rev offset: %06X" % (indent, self.prev_rev_offset), file=fd)
 
 		if self.comment_offset != 0:
-			print("  Comment offset: %06X, length: %04X" %
-				(self.comment_offset, self.comment_length), file=fd)
+			print("%sComment offset: %06X, length: %04X" %
+				(indent, self.comment_offset, self.comment_length), file=fd)
 		if self.label_comment_offset != 0:
-			print("  Label comment offset: %06X, length: %04X" %
-				(self.label_comment_offset, self.label_comment_length), file=fd)
+			print("%sLabel comment offset: %06X, length: %04X" %
+				(indent, self.label_comment_offset, self.label_comment_length), file=fd)
 		return
 
 class vss_label_revision_record(vss_revision_record):
 
-	def print(self, fd):
-		super().print(fd)
+	def print(self, fd, indent:str=''):
+		super().print(fd, indent)
 
-		print("  Label: %s" % (self.decode(self.label)), file=fd)
+		print("%sLabel: %s" % (indent, self.decode(self.label)), file=fd)
 		return
 
 class vss_common_revision_record(vss_revision_record):
@@ -133,10 +133,10 @@ class vss_common_revision_record(vss_revision_record):
 		self.physical = self.reader.read_byte_string(10)
 		return
 
-	def print(self, fd):
-		super().print(fd)
+	def print(self, fd, indent:str=''):
+		super().print(fd, indent)
 
-		print("  Name: %s" % (self.decode_name(self.name, self.physical)), file=fd)
+		print("%sName: %s" % (indent, self.decode_name(self.name, self.physical)), file=fd)
 		return
 
 class vss_destroy_revision_record(vss_revision_record):
@@ -159,12 +159,12 @@ class vss_destroy_revision_record(vss_revision_record):
 		self.physical = self.reader.read_byte_string(10)
 		return
 
-	def print(self, fd):
-		super().print(fd)
+	def print(self, fd, indent:str=''):
+		super().print(fd, indent)
 
 		if self.was_deleted:
-			print("  Previously deleted: %d" % (self.was_deleted), file=fd)
-		print("  Name: %s" % (self.decode_name(self.name, self.physical)), file=fd)
+			print("%sPreviously deleted: %d" % (indent, self.was_deleted), file=fd)
+		print("%sName: %s" % (indent, self.decode_name(self.name, self.physical)), file=fd)
 		return
 
 class vss_rename_revision_record(vss_revision_record):
@@ -185,10 +185,10 @@ class vss_rename_revision_record(vss_revision_record):
 		self.physical = self.reader.read_byte_string(10)
 		return
 
-	def print(self, fd):
-		super().print(fd)
+	def print(self, fd, indent:str=''):
+		super().print(fd, indent)
 
-		print("  Name: %s -> %s" % (self.decode_name(self.old_name),
+		print("%sName: %s -> %s" % (indent, self.decode_name(self.old_name),
 								self.decode_name(self.name, self.physical)), file=fd)
 		return
 
@@ -210,11 +210,11 @@ class vss_move_revision_record(vss_revision_record):
 		self.physical = self.reader.read_byte_string(10)
 		return
 
-	def print(self, fd):
-		super().print(fd)
+	def print(self, fd, indent:str=''):
+		super().print(fd, indent)
 
-		print("  Project path: %s" % (self.decode(self.project_path)), file=fd)
-		print("  Name: %s" % (self.decode_name(self.name, self.physical)), file=fd)
+		print("%sProject path: %s" % (indent, self.decode(self.project_path)), file=fd)
+		print("%sName: %s" % (indent, self.decode_name(self.name, self.physical)), file=fd)
 		return
 
 class vss_share_revision_record(vss_revision_record):
@@ -246,16 +246,16 @@ class vss_share_revision_record(vss_revision_record):
 		self.physical = reader.read_byte_string(10)
 		return
 
-	def print(self, fd):
-		super().print(fd)
+	def print(self, fd, indent:str=''):
+		super().print(fd, indent)
 
-		print("  Name: %s" % (self.decode_name(self.name, self.physical)), file=fd)
-		print("  Share from path: %s" % (self.decode(self.project_path)), file=fd)
-		print("  Index in items array: %d" % (self.project_idx), file=fd)
+		print("%sName: %s" % (indent, self.decode_name(self.name, self.physical)), file=fd)
+		print("%sShare from path: %s" % (indent, self.decode(self.project_path)), file=fd)
+		print("%sIndex in items array: %d" % (indent, self.project_idx), file=fd)
 		if self.unpinned_revision == 0:
-			print("  Pinned at revision: %d" % (self.pinned_revision), file=fd)
+			print("%sPinned at revision: %d" % (indent, self.pinned_revision), file=fd)
 		elif self.unpinned_revision > 0:
-			print("  Unpinned at revision: %d" % (self.unpinned_revision), file=fd)
+			print("%sUnpinned at revision: %d" % (indent, self.unpinned_revision), file=fd)
 		return
 
 class vss_branch_revision_record(vss_common_revision_record):
@@ -272,10 +272,10 @@ class vss_branch_revision_record(vss_common_revision_record):
 		self.branch_file = self.reader.read_byte_string(10)
 		return
 
-	def print(self, fd):
-		super().print(fd)
+	def print(self, fd, indent:str=''):
+		super().print(fd, indent)
 
-		print("  Branched from file: %s" % (self.decode(self.branch_file)), file=fd)
+		print("%sBranched from file: %s" % (indent, self.decode(self.branch_file)), file=fd)
 		return
 
 class vss_checkin_revision_record(vss_revision_record):
@@ -299,13 +299,13 @@ class vss_checkin_revision_record(vss_revision_record):
 
 		return
 
-	def print(self, fd):
-		super().print(fd)
+	def print(self, fd, indent:str=''):
+		super().print(fd, indent)
 
-		print("  Prev delta offset: %06X" % (self.prev_delta_offset), file=fd)
+		print("%sPrev delta offset: %06X" % (indent, self.prev_delta_offset), file=fd)
 		if self.filler:
-			print("  Filler: %08X" % (self.filler), file=fd)
-		print("  Project path: %s" % (self.decode(self.project_path)), file=fd)
+			print("%sFiller: %08X" % (indent, self.filler), file=fd)
+		print("%sProject path: %s" % (indent, self.decode(self.project_path)), file=fd)
 		return
 
 class vss_archive_restore_revision_record(vss_common_revision_record):
@@ -325,14 +325,14 @@ class vss_archive_restore_revision_record(vss_common_revision_record):
 		# NOTE: Two more words in the record may be meaningful
 		return
 
-	def print(self, fd):
-		super().print(fd)
+	def print(self, fd, indent:str=''):
+		super().print(fd, indent)
 
 		if self.filler16:
-			print("  Filler: %04X" % (self.filler16), file=fd)
-		print("  Archive path: %s" % (self.decode(self.archive_path)), file=fd)
+			print("%sFiller: %04X" % (indent, self.filler16), file=fd)
+		print("%sArchive path: %s" % (indent, self.decode(self.archive_path)), file=fd)
 		if self.filler32:
-			print("  Filler: %08X" % (self.filler32), file=fd)
+			print("%sFiller: %08X" % (indent, self.filler32), file=fd)
 		return
 
 class vss_revision_record_factory:

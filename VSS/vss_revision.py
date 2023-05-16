@@ -48,14 +48,15 @@ class vss_revision:
 	def apply_to_project_items(self, item_file:vss_project_item_file):
 		return
 
-	def print(self, fd):
-		print("  Revision: %d" % (self.revision_num), file=fd)
-		print("  By: '%s', at: %s (%d)" % (self.author,
+	def print(self, fd, indent:str=''):
+		print("%sRevision: %d" % (indent, self.revision_num), file=fd)
+		print("%sBy: '%s', at: %s (%d)" % (indent, self.author,
 						timestamp_to_datetime(self.timestamp), self.timestamp), file=fd)
-		print("  %s (%d)" % (VssRevisionAction(self.action), self.action), file=fd)
+		print("%s%s (%d)" % (indent, VssRevisionAction(self.action), self.action), file=fd)
 
 		if self.comment:
-			print("  Comment: %s" % (indent_string(self.comment, '           ')), file=fd)
+			indent += '  '
+			print("%sComment: %s" % (indent, indent_string(self.comment, indent + '         ')), file=fd)
 		return
 
 class vss_label_revision(vss_revision):
@@ -72,12 +73,13 @@ class vss_label_revision(vss_revision):
 			self.label_comment:str = None
 		return
 
-	def print(self, fd):
-		super().print(fd)
+	def print(self, fd, indent:str=''):
+		super().print(fd, indent)
 
 		if self.label_comment:
-			print("  Label comment: %s" % (indent_string(
-							self.label_comment, '                 ')), file=fd)
+			indent += '  '
+			print("%sLabel comment: %s" % (indent, indent_string(
+							self.label_comment, indent + '               ')), file=fd)
 		return
 
 class vss_full_name:
@@ -105,10 +107,10 @@ class vss_named_revision(vss_revision):
 			assert(self.full_name.is_project == self.PROJECT_REVISION)
 		return
 
-	def print(self, fd):
-		super().print(fd)
+	def print(self, fd, indent:str=''):
+		super().print(fd, indent)
 
-		print("  Name: %s" % (self.full_name), file=fd)
+		print("%sName: %s" % (indent, self.full_name), file=fd)
 		return
 
 class vss_create_revision(vss_named_revision):
@@ -165,11 +167,11 @@ class vss_destroy_revision(vss_named_revision):
 		self.was_deleted = record.was_deleted != 0
 		return
 
-	def print(self, fd):
-		super().print(fd)
+	def print(self, fd, indent:str=''):
+		super().print(fd, indent)
 
 		if self.was_deleted:
-			print("  Previously deleted", file=fd)
+			print(indent + "Previously deleted", file=fd)
 		return
 
 	def apply_to_project_items(self, item_file:vss_project_item_file):
@@ -195,10 +197,10 @@ class vss_rename_revision(vss_named_revision):
 		self.item_index = item_file.add_item(self.full_name)
 		return
 
-	def print(self, fd):
-		super().print(fd)
+	def print(self, fd, indent:str=''):
+		super().print(fd, indent)
 
-		print("  Old name: %s" % (self.old_full_name), file=fd)
+		print("%sOld name: %s" % (indent, self.old_full_name), file=fd)
 		return
 
 class vss_rename_project_revision(vss_rename_revision):
@@ -221,10 +223,10 @@ class vss_move_from_revision(vss_move_revision):
 		self.item_index = item_file.add_item(self.full_name)
 		return
 
-	def print(self, fd):
-		super().print(fd)
+	def print(self, fd, indent:str=''):
+		super().print(fd, indent)
 
-		print("  Move from: %s" % (self.project_path,), file=fd)
+		print("%sMove from: %s" % (indent, self.project_path), file=fd)
 		return
 
 class vss_move_to_revision(vss_move_revision):
@@ -234,10 +236,10 @@ class vss_move_to_revision(vss_move_revision):
 		assert(item is not None and self.item_index >= 0)
 		return
 
-	def print(self, fd):
-		super().print(fd)
+	def print(self, fd, indent:str=''):
+		super().print(fd, indent)
 
-		print("  Move to: %s" % (self.project_path,), file=fd)
+		print("%sMove to: %s" % (indent, self.project_path), file=fd)
 		return
 
 class vss_share_revision(vss_named_revision):
@@ -260,15 +262,15 @@ class vss_share_revision(vss_named_revision):
 			assert(item is not None and item.physical_name == self.full_name.physical_name)
 		return
 
-	def print(self, fd):
-		super().print(fd)
+	def print(self, fd, indent:str=''):
+		super().print(fd, indent)
 
 		if self.unpinned_revision == 0:
-			print("  Pinned revision: %d" % (self.pinned_revision), file=fd)
+			print("%sPinned revision: %d" % (indent, self.pinned_revision), file=fd)
 		elif self.unpinned_revision > 0:
-			print("  Unpinned revision: %d" % (self.unpinned_revision), file=fd)
+			print("%sUnpinned revision: %d" % (indent, self.unpinned_revision), file=fd)
 		else:
-			print("  Share from: %s" % (self.project_path,), file=fd)
+			print("%sShare from: %s" % (indent, self.project_path), file=fd)
 		return
 
 class vss_checkin_revision(vss_revision):
@@ -289,10 +291,10 @@ class vss_checkin_revision(vss_revision):
 			data = self.delta_record.apply_delta(data)
 		return data
 
-	def print(self, fd):
-		super().print(fd)
+	def print(self, fd, indent:str=''):
+		super().print(fd, indent)
 
-		print("  Checked in at: %s" % (self.project_path,), file=fd)
+		print("%sChecked in at: %s" % (indent, self.project_path), file=fd)
 		return
 
 class vss_branch_revision(vss_named_revision):
@@ -304,10 +306,10 @@ class vss_branch_revision(vss_named_revision):
 		self.source_full_name = vss_full_name(database, record.name, record.branch_file)
 		return
 
-	def print(self, fd):
-		super().print(fd)
+	def print(self, fd, indent:str=''):
+		super().print(fd, indent)
 
-		print("  Branched from: %s" % (self.source_full_name), file=fd)
+		print("%sBranched from: %s" % (indent, self.source_full_name), file=fd)
 		return
 
 class vss_create_branch_revision(vss_branch_revision):
@@ -329,10 +331,10 @@ class vss_archive_restore_revision(vss_named_revision):
 		self.archive_path = record.decode(record.archive_path)
 		return
 
-	def print(self, fd):
-		super().print(fd)
+	def print(self, fd, indent:str=''):
+		super().print(fd, indent)
 
-		print("  Archive path: %s" % (self.archive_path,), file=fd)
+		print("%sArchive path: %s" % (indent, self.archive_path), file=fd)
 		return
 
 class vss_archive_revision(vss_archive_restore_revision):

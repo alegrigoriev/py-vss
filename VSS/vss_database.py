@@ -138,8 +138,8 @@ class vss_database:
 			self.physical_name_dict[physical_name] = decoded_name
 		return decoded_name
 
-	def print(self, fd):
-		print('Database:', self.base_path, file=fd)
+	def print(self, fd, indent=''):
+		print(indent+'Database:', self.base_path, file=fd)
 
-		self.get_project_tree().print(fd)
+		self.get_project_tree().print(fd, indent)
 		return

@@ -41,12 +41,12 @@ class vss_name_header_record(vss_record):
 		self.eof_offset = self.reader.read_int32()
 		return
 
-	def print(self, fd):
-		super().print(fd)
+	def print(self, fd, indent:str=''):
+		super().print(fd, indent)
 
 		if any(self.filler_words):
-			print("  Filler: %08X %08X %08X %08X" % self.filler_words, file=fd)
-		print("  EOF offset: %06X" % (self.eof_offset), file=fd)
+			print("%sFiller: %08X %08X %08X %08X" % (indent, *self.filler_words), file=fd)
+		print("%sEOF offset: %06X" % (indent, self.eof_offset), file=fd)
 		return
 
 class vss_name_record(vss_record):
@@ -88,12 +88,12 @@ class vss_name_record(vss_record):
 	def get(self, name_kind, default_value=None):
 		return self.names.get(int(name_kind), default_value)
 
-	def print(self, fd):
-		super().print(fd)
+	def print(self, fd, indent:str=''):
+		super().print(fd, indent)
 
-		print("  Num names: %d" % (len(self.names)), file=fd)
+		print("%sNum names: %d" % (indent, len(self.names)), file=fd)
 		for name_kind, name in self.names.items():
-			print("    %s: %s" % (self.NameKind(name_kind), self.decode(name)), file=fd)
+			print("%s  %s: %s" % (indent, self.NameKind(name_kind), self.decode(name)), file=fd)
 
 		return
 
@@ -111,8 +111,8 @@ class vss_name_file(vss_record_file):
 	def get_name_record(self, name_offset)->vss_name_record:
 		return self.get_record(name_offset)
 
-	def print(self, fd):
-		print("  Name file %s" % (self.filename), file=fd)
+	def print(self, fd, indent:str=''):
+		print("%sName file %s" % (indent, self.filename), file=fd)
 
-		super().print(fd)
+		super().print(fd, indent)
 		return
