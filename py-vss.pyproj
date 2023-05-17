@@ -33,6 +33,7 @@
     <Compile Include="VSS\vss_revision.py" />
     <Compile Include="VSS\vss_action.py" />
     <Compile Include="VSS\vss_verbose.py" />
+    <Compile Include="VSS\vss_changeset.py" />
     <Compile Include="vss_main.py" />
   </ItemGroup>
   <ItemGroup>

@@ -608,6 +608,56 @@ which returns an action object of a specific class for the given `revision`.
 This function, defined as `create_project_action(revision, base_path)` is an action factory,
 which returns an action object of a specific class for the given `revision`.
 
+# Changelist reconstruction
+
+The changelist is reconstructed by recursively sorting revisions, starting from the root project.
+
+As the SourceSafe database is organized, there are two ways to reconstruct the history.
+
+The first way is to walk the history starting from the very first log element in the root project
+and reconstruct the project tree and its history as it develops.
+This way may pick up some abandoned (destroyed) history as well.
+Unfortunately, if there are "restore from archive" operations in the history, their timestamps become
+out of order.
+
+The second way is to walk back from the most recent snapshot of the tree, which is kept in the SourceSafe project files,
+and apply the log elements in the reverse fashion. This way, the out of order operations do not get in the way.
+
+When SourceSafe shows the full log, it doesn't account for renames and moves.
+This program has to do that while walking the revision log backward.
+
+## File `VSS/vss_changeset.py`
+
+The file contains classes to build a list of changesets (revisions).
+
+class `vss_change`
+- encapsulates a changeset (revision), as a list of vss_action objects with common timestamp,
+author and comment.
+
+class `vss_file_changeset_item`
+- based on class `vss_file`, extends it with methods to produce sequence of `vss_action` objects
+for the file revisions, in reverse timestamp order.
+
+class `vss_directory_changeset_item`
+- based on class `vss_project`, extends it with methods to produce sequence of `vss_action` objects
+for the directory revisions and all its child files and subdirectories, in reverse timestamp order.
+
+class `vss_changeset_history`
+- builds a sorted list of `vss_action` objects and combines them to a list of `vss_change` objects.
+
+### class `vss_changeset_history`
+
+The class provides the following methods:
+
+`__init__(self, database:vss_database)`
+- constructs the object for the given database and invokes `build` method.
+
+`build(self, root_project:vss_directory_changeset_item)`
+- internal method to build the changelist.
+
+`get_changelist(self)`
+- returns the built changelist.
+
 # Command line interface
 
 Although the main use of this package is as a framework, the command line capability

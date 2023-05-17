@@ -177,6 +177,8 @@ class vss_file(vss_item):
 
 class vss_project(vss_item):
 
+	file_item_type = vss_file
+
 	def __init__(self, database:vss_database,
 			physical_name:str, logical_name:str, flags:int, recursive=True):
 		super().__init__(database, vss_project_item_file, physical_name, logical_name, flags)
@@ -221,10 +223,10 @@ class vss_project(vss_item):
 	def open_new_item(self, physical_name:str, logical_name:str, is_project:bool,
 				flags=0, pinned_version:int=0):
 		if is_project:
-			item = vss_project(self.database, physical_name, logical_name,
+			item = type(self)(self.database, physical_name, logical_name,
 							flags)
 		else:
-			item = vss_file(self.database, physical_name, logical_name,
+			item = self.file_item_type(self.database, physical_name, logical_name,
 							flags, pinned_version)
 
 		return item
@@ -268,6 +270,28 @@ class vss_project(vss_item):
 			assert(item.logical_name not in self.items_by_logical_name)
 			self.items_by_logical_name[item.logical_name] = item
 		return item_idx
+
+	def set_item_deleted(self, item_idx):
+		# Delete the file item from this directory
+		item = self.get_item_by_index(item_idx)
+		if item is None or item.deleted:
+			return item
+
+		item.deleted = True
+		assert(item.logical_name in self.items_by_logical_name)
+		self.items_by_logical_name.pop(item.logical_name)
+		return item
+
+	def unset_item_deleted(self, item_idx):
+		# Un-delete the file item from this directory
+		item = self.get_item_by_index(item_idx)
+		if item is None or not item.deleted:
+			return item
+
+		item.deleted = False
+		assert(item.logical_name not in self.items_by_logical_name)
+		self.items_by_logical_name[item.logical_name] = item
+		return item
 
 	def find_by_path_name(self, full_name:str):
 		# Find the root project
