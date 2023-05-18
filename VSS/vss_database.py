@@ -16,6 +16,7 @@ from __future__ import annotations
 from typing import DefaultDict
 
 from .vss_exception import VssFileNotFoundException
+from .vss_verbose import VerboseFlags
 
 import re
 from pathlib import Path
@@ -141,8 +142,15 @@ class vss_database:
 			self.physical_name_dict[physical_name] = decoded_name
 		return decoded_name
 
-	def print(self, fd, indent=''):
-		print(indent+'Database:', self.base_path, file=fd)
+	# Three major variants of the database dump in human-readable form:
+	# 1.Directory tree of the current snapshot
+	# 2. List of all files referred by the tree and all their records
+	# 3. List of revisions of all projects and their files
+	def print(self, fd, indent='', verbose=VerboseFlags.AllDatabase):
+		if verbose & VerboseFlags.Database:
+			print(indent+'Database:', self.base_path, file=fd)
+		if verbose & VerboseFlags.Projects:
+			self.get_project_tree().print(fd, indent, verbose)
 
-		self.get_project_tree().print(fd, indent)
+		# TODO: print all files
 		return

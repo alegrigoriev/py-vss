@@ -43,7 +43,13 @@ def main():
 	database.get_project_tree()
 	print("Done", file=sys.stderr)
 
-	database.print(log_file)
+	from VSS.vss_verbose import VerboseFlags
+	log_verbose = VerboseFlags.Database|VerboseFlags.Projects|VerboseFlags.Files
+	log_verbose |= VerboseFlags.ProjectRevisions|VerboseFlags.FileRevisions
+	log_verbose |= VerboseFlags.Records
+	log_verbose |= VerboseFlags.RecordHeaders|VerboseFlags.FileHeaders
+
+	database.print(log_file, verbose=log_verbose)
 	return 0
 
 if __name__ == "__main__":

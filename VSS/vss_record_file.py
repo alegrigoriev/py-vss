@@ -16,6 +16,7 @@ from __future__ import annotations
 from .vss_exception import EndOfBufferException, RecordTruncatedException
 from .vss_exception import UnrecognizedRecordException, RecordClassMismatchException
 from .vss_record import *
+from .vss_verbose import VerboseFlags
 
 from typing import DefaultDict
 
@@ -89,11 +90,13 @@ class vss_record_file:
 					% (offset, self.filename, record_class.__name__, type(record).__name__))
 		return record
 
-	def print(self, fd, indent:str=''):
-		if self.header is not None:
+	def print(self, fd, indent:str='', verbose:VerboseFlags=VerboseFlags.FileHeaders):
+		if self.header is not None and (verbose & VerboseFlags.FileHeaders):
 			print(indent + "Header:", file=fd)
-			self.header.print(fd, indent+'  ')
+			self.header.print(fd, indent+'  ', verbose)
 
-		for record in self.records.values():
-			record.print(fd, indent)
+		if verbose & VerboseFlags.Records:
+			for record in self.records.values():
+				print('',file=fd)
+				record.print(fd, indent, verbose)
 		return

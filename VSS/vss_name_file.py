@@ -18,6 +18,7 @@ from .vss_record import vss_record, vss_record_header
 from .vss_record_file import vss_record_file
 from .vss_database import vss_database
 from enum import IntEnum
+from .vss_verbose import VerboseFlags
 
 class vss_name_header_record(vss_record):
 
@@ -41,8 +42,8 @@ class vss_name_header_record(vss_record):
 		self.eof_offset = self.reader.read_int32()
 		return
 
-	def print(self, fd, indent:str=''):
-		super().print(fd, indent)
+	def print(self, fd, indent:str='', verbose:VerboseFlags=VerboseFlags.FileHeaders):
+		super().print(fd, indent, verbose)
 
 		if any(self.filler_words):
 			print("%sFiller: %08X %08X %08X %08X" % (indent, *self.filler_words), file=fd)
@@ -88,8 +89,8 @@ class vss_name_record(vss_record):
 	def get(self, name_kind, default_value=None):
 		return self.names.get(int(name_kind), default_value)
 
-	def print(self, fd, indent:str=''):
-		super().print(fd, indent)
+	def print(self, fd, indent:str='', verbose:VerboseFlags=VerboseFlags.Records):
+		super().print(fd, indent, verbose)
 
 		print("%sNum names: %d" % (indent, len(self.names)), file=fd)
 		for name_kind, name in self.names.items():
@@ -111,8 +112,7 @@ class vss_name_file(vss_record_file):
 	def get_name_record(self, name_offset)->vss_name_record:
 		return self.get_record(name_offset)
 
-	def print(self, fd, indent:str=''):
+	def print(self, fd, indent:str='', verbose:VerboseFlags=VerboseFlags.FileHeaders):
 		print("%sName file %s" % (indent, self.filename), file=fd)
-
-		super().print(fd, indent)
+		super().print(fd, indent, verbose)
 		return

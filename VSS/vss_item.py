@@ -22,6 +22,7 @@ from .vss_exception import VssFileNotFoundException
 from .vss_record import vss_record, vss_record_header, vss_name
 from .vss_record_file import vss_record_file
 from .vss_item_file import *
+from .vss_verbose import VerboseFlags
 
 from enum import IntFlag
 
@@ -84,10 +85,15 @@ class vss_item:
 
 		return sub_item_name
 
-	def print(self, fd, indent:str=''):
-		print("%sEntry flags=%s" % (indent, ProjectEntryFlag(self.flags)), file=fd)
+	def print(self, fd, indent:str='', verbose:VerboseFlags=VerboseFlags.FileHeaders):
+		if verbose & VerboseFlags.FileHeaders:
+			print("%sEntry flags=%s" % (indent, ProjectEntryFlag(self.flags)), file=fd)
 
-		self.item_file.print(fd, indent)
+		if verbose & (VerboseFlags.ProjectRevisions|VerboseFlags.FileRevisions):
+			verbose &= ~VerboseFlags.Records
+		elif not verbose & VerboseFlags.Records:
+			return
+		self.item_file.print(fd, indent+'  ', verbose)
 		return
 
 class vss_project_entry_record(vss_record):
@@ -121,8 +127,8 @@ class vss_project_entry_record(vss_record):
 		self.physical = reader.read_byte_string(10)
 		return
 
-	def print(self, fd, indent:str=''):
-		super().print(fd, indent)
+	def print(self, fd, indent:str='', verbose:VerboseFlags=VerboseFlags.RecordHeaders):
+		super().print(fd, indent, verbose)
 
 		print("%sItem Type: %d - Name: %s"
 					% (indent, self.item_type, self.decode_name(self.name, self.physical)), file=fd)
@@ -160,11 +166,11 @@ class vss_file(vss_item):
 	def is_checked_out(self):
 		return self.item_file.is_checked_out()
 
-	def print(self, fd, indent=''):
+	def print(self, fd, indent='', verbose:VerboseFlags=VerboseFlags.FileRevisions):
 		print("\n%sFile %s" % (indent, self.make_full_path()), file=fd)
 		print("%s  File flags=%s" % (indent, FileHeaderFlags(self.item_file.header.flags)), file=fd)
 
-		super().print(fd, indent+'  ')
+		super().print(fd, indent+'  ', verbose & ~VerboseFlags.ProjectRevisions)
 		return
 
 class vss_project(vss_item):
@@ -294,13 +300,16 @@ class vss_project(vss_item):
 	def get_item_by_logical_name(self, logical_name:str)->vss_item:
 		return self.items_by_logical_name.get(logical_name, None)
 
-	def print(self, fd, indent:str=''):
-		print("\n%sProject %s" % (indent, self.make_full_path()), file=fd)
+	def print(self, fd, indent:str='', verbose:VerboseFlags=VerboseFlags.Files|VerboseFlags.FileRevisions):
+		if verbose & (VerboseFlags.Projects|VerboseFlags.ProjectRevisions):
+			print("\n%sProject %s" % (indent, self.make_full_path()), file=fd)
+			super().print(fd, indent+'  ', verbose & ~VerboseFlags.FileRevisions)
 
 		indent += '  '
-		super().print(fd, indent)
-
 		# Print child items
 		for item in self.all_items():
-			item.print(fd, indent)
+			if item.is_project():
+				item.print(fd, indent, verbose)
+			elif verbose & (VerboseFlags.Files|VerboseFlags.FileRevisions):
+				item.print(fd, indent, verbose & ~VerboseFlags.ProjectRevisions)
 		return

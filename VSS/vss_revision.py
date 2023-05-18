@@ -17,6 +17,7 @@ from __future__ import annotations
 from .vss_exception import VssFileNotFoundException
 from .vss_item_file import *
 from .vss_revision_record import *
+from .vss_verbose import *
 
 ### vss_revision is associated with logical item: project or an instance of file
 class vss_revision:
@@ -48,7 +49,7 @@ class vss_revision:
 	def apply_to_project_items(self, item_file:vss_project_item_file):
 		return
 
-	def print(self, fd, indent:str=''):
+	def print(self, fd, indent:str='', verbose:VerboseFlags=VerboseFlags.FileRevisions):
 		print("%sRevision: %d" % (indent, self.revision_num), file=fd)
 		print("%sBy: '%s', at: %s (%d)" % (indent, self.author,
 						timestamp_to_datetime(self.timestamp), self.timestamp), file=fd)
@@ -73,8 +74,8 @@ class vss_label_revision(vss_revision):
 			self.label_comment:str = None
 		return
 
-	def print(self, fd, indent:str=''):
-		super().print(fd, indent)
+	def print(self, fd, indent:str='', verbose:VerboseFlags=VerboseFlags.FileRevisions):
+		super().print(fd, indent, verbose)
 
 		if self.label_comment:
 			indent += '  '
@@ -107,8 +108,8 @@ class vss_named_revision(vss_revision):
 			assert(self.full_name.is_project == self.PROJECT_REVISION)
 		return
 
-	def print(self, fd, indent:str=''):
-		super().print(fd, indent)
+	def print(self, fd, indent:str='', verbose:VerboseFlags=VerboseFlags.FileRevisions):
+		super().print(fd, indent, verbose)
 
 		print("%sName: %s" % (indent, self.full_name), file=fd)
 		return
@@ -167,8 +168,8 @@ class vss_destroy_revision(vss_named_revision):
 		self.was_deleted = record.was_deleted != 0
 		return
 
-	def print(self, fd, indent:str=''):
-		super().print(fd, indent)
+	def print(self, fd, indent:str='', verbose:VerboseFlags=VerboseFlags.FileRevisions):
+		super().print(fd, indent, verbose)
 
 		if self.was_deleted:
 			print(indent + "Previously deleted", file=fd)
@@ -197,8 +198,8 @@ class vss_rename_revision(vss_named_revision):
 		self.item_index = item_file.add_item(self.full_name)
 		return
 
-	def print(self, fd, indent:str=''):
-		super().print(fd, indent)
+	def print(self, fd, indent:str='', verbose:VerboseFlags=VerboseFlags.FileRevisions):
+		super().print(fd, indent, verbose)
 
 		print("%sOld name: %s" % (indent, self.old_full_name), file=fd)
 		return
@@ -223,8 +224,8 @@ class vss_move_from_revision(vss_move_revision):
 		self.item_index = item_file.add_item(self.full_name)
 		return
 
-	def print(self, fd, indent:str=''):
-		super().print(fd, indent)
+	def print(self, fd, indent:str='', verbose:VerboseFlags=VerboseFlags.FileRevisions):
+		super().print(fd, indent, verbose)
 
 		print("%sMove from: %s" % (indent, self.project_path), file=fd)
 		return
@@ -236,8 +237,8 @@ class vss_move_to_revision(vss_move_revision):
 		assert(item is not None and self.item_index >= 0)
 		return
 
-	def print(self, fd, indent:str=''):
-		super().print(fd, indent)
+	def print(self, fd, indent:str='', verbose:VerboseFlags=VerboseFlags.FileRevisions):
+		super().print(fd, indent, verbose)
 
 		print("%sMove to: %s" % (indent, self.project_path), file=fd)
 		return
@@ -262,8 +263,8 @@ class vss_share_revision(vss_named_revision):
 			assert(item is not None and item.physical_name == self.full_name.physical_name)
 		return
 
-	def print(self, fd, indent:str=''):
-		super().print(fd, indent)
+	def print(self, fd, indent:str='', verbose:VerboseFlags=VerboseFlags.FileRevisions):
+		super().print(fd, indent, verbose)
 
 		if self.unpinned_revision == 0:
 			print("%sPinned revision: %d" % (indent, self.pinned_revision), file=fd)
@@ -291,8 +292,8 @@ class vss_checkin_revision(vss_revision):
 			data = self.delta_record.apply_delta(data)
 		return data
 
-	def print(self, fd, indent:str=''):
-		super().print(fd, indent)
+	def print(self, fd, indent:str='', verbose:VerboseFlags=VerboseFlags.FileRevisions):
+		super().print(fd, indent, verbose)
 
 		print("%sChecked in at: %s" % (indent, self.project_path), file=fd)
 		return
@@ -306,8 +307,8 @@ class vss_branch_revision(vss_named_revision):
 		self.source_full_name = vss_full_name(database, record.name, record.branch_file)
 		return
 
-	def print(self, fd, indent:str=''):
-		super().print(fd, indent)
+	def print(self, fd, indent:str='', verbose:VerboseFlags=VerboseFlags.FileRevisions):
+		super().print(fd, indent, verbose)
 
 		print("%sBranched from: %s" % (indent, self.source_full_name), file=fd)
 		return
@@ -331,8 +332,8 @@ class vss_archive_restore_revision(vss_named_revision):
 		self.archive_path = record.decode(record.archive_path)
 		return
 
-	def print(self, fd, indent:str=''):
-		super().print(fd, indent)
+	def print(self, fd, indent:str='', verbose:VerboseFlags=VerboseFlags.FileRevisions):
+		super().print(fd, indent, verbose)
 
 		print("%sArchive path: %s" % (indent, self.archive_path), file=fd)
 		return

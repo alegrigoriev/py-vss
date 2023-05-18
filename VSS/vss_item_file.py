@@ -20,6 +20,7 @@ from .vss_record import *
 from .vss_record_file import vss_record_file
 from .vss_record_factory import vss_item_record_factory
 from .vss_revision_record import vss_revision_record
+from .vss_verbose import VerboseFlags
 
 from enum import IntEnum, IntFlag
 
@@ -62,7 +63,7 @@ class vss_item_file_header:
 		# Total 52 bytes read (0x34)
 		return
 
-	def print(self, fd, indent=''):
+	def print(self, fd, indent='', verbose=VerboseFlags.Files):
 		print("%sFile type: %s, version: %d" %
 			(indent, 'Project' if self.file_type == ItemFileType.Project else 'File', self.file_version), file=fd)
 		if any(self.filler_words):
@@ -111,8 +112,8 @@ class vss_item_header_record(vss_record):
 			self.item_header_filler_words = None
 		return
 
-	def print(self, fd, indent:str=''):
-		super().print(fd, indent)
+	def print(self, fd, indent:str='', verbose:VerboseFlags=VerboseFlags.RecordHeaders):
+		super().print(fd, indent, verbose)
 
 		print("%sItem Type: %s - Revisions: %d - Name: %s" % (indent,
 						'Project' if self.item_type == ItemFileType.Project else 'File',
@@ -205,8 +206,8 @@ class vss_file_header_record(vss_item_header_record):
 		self.creation_timestamp = reader.read_uint32()
 		return
 
-	def print(self, fd, indent:str=''):
-		super().print(fd, indent)
+	def print(self, fd, indent:str='', verbose:VerboseFlags=VerboseFlags.RecordHeaders):
+		super().print(fd, indent, verbose)
 
 		print("%sFlags: %4X (%s)" % (indent, self.flags, FileHeaderFlags(self.flags)), file=fd)
 		if self.branch_file:
@@ -246,8 +247,8 @@ class vss_project_header_record(vss_item_header_record):
 		self.subprojects = reader.read_int16()
 		return
 
-	def print(self, fd, indent:str=''):
-		super().print(fd, indent)
+	def print(self, fd, indent:str='', verbose:VerboseFlags=VerboseFlags.RecordHeaders):
+		super().print(fd, indent, verbose)
 
 		print("%sParent project: %s" % (indent, self.parent_project), file=fd)
 		print("%sParent file: %s" % (indent, self.parent_file), file=fd)
@@ -284,14 +285,19 @@ class vss_item_file(vss_record_file):
 	def get_last_revision_num(self):
 		return self.header.num_revisions
 
-	def print(self, fd, indent:str=''):
+	def print(self, fd, indent:str='', verbose:VerboseFlags=VerboseFlags.FileHeaders):
+		if verbose & (VerboseFlags.FileHeaders|VerboseFlags.Records):
+			print("%sItem file %s, size: %06X" % (indent, self.filename, self.file_size), file=fd)
+			super().print(fd, indent + '  ', verbose)
 
-		print("%sItem file %s, size: %06X" % (indent, self.filename, self.file_size), file=fd)
-		super().print(fd, indent + '  ')
-
-		for revision in self.revisions:
-			print('', file=fd)	# insert an empty line
-			revision.print(fd, indent)
+		if verbose & VerboseFlags.Records:
+			# print all records
+			super().print(fd, indent, verbose|VerboseFlags.FileHeaders)
+		elif verbose & (VerboseFlags.FileRevisions|VerboseFlags.ProjectRevisions):
+			super().print(fd, indent, verbose)
+			for revision in self.revisions:
+				print('', file=fd)	# insert an empty line
+				revision.print(fd, indent, verbose|VerboseFlags.Records)
 		return
 
 class vss_project_item_file(vss_item_file):
@@ -496,13 +502,17 @@ class vss_file_item_file(vss_item_file):
 			return b''
 		return revision.revision_data
 
-	def print(self, fd, indent:str=''):
-		super().print(fd, indent)
+	def print(self, fd, indent:str='', verbose:VerboseFlags=VerboseFlags.FileHeaders):
+		super().print(fd, indent, verbose)
 
 		crc = crc32.calculate(self.last_data)
 		if crc != self.header.data_crc:
 			print("header.data_crc=%08X, calculated: %08X" % (self.header.data_crc, crc), file=fd)
 
+		if verbose & VerboseFlags.Records:
+			return
+
+		# With VerboseFlags.Records flag, these records are printed in file order
 		offset = self.header.project_offset
 		if offset != 0:
 			print("\n%sIncluded in %d project(s):" % (indent, self.header.project_count), file=fd)
@@ -511,7 +521,7 @@ class vss_file_item_file(vss_item_file):
 				# Because some projects may be inactive at this time
 				project_record = self.get_record(offset, vss_project_record)
 				print('', file=fd)
-				project_record.print(fd, indent + '  ')
+				project_record.print(fd, indent + '  ', verbose)
 				offset = project_record.prev_project_offset
 
 		offset = self.header.branch_offset
@@ -520,7 +530,7 @@ class vss_file_item_file(vss_item_file):
 			while offset != 0:
 				branch_record = self.get_record(offset, vss_branch_record)
 				print('', file=fd)
-				branch_record.print(fd, indent + '  ')
+				branch_record.print(fd, indent + '  ', verbose)
 				offset = branch_record.prev_branch_offset
 
 		offset = self.header.last_checkout_offset
@@ -529,7 +539,7 @@ class vss_file_item_file(vss_item_file):
 			while offset != 0:
 				checkout_record = self.get_record(offset, vss_checkout_record)
 				print('', file=fd)
-				checkout_record.print(fd, indent + '  ')
+				checkout_record.print(fd, indent + '  ', verbose)
 				if offset == self.header.first_checkout_offset:
 					break
 				offset = checkout_record.prev_checkout_offset

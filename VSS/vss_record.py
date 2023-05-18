@@ -22,6 +22,7 @@ if sys.version_info < (3, 9):
 
 from typing import List
 from .vss_exception import EndOfBufferException, UnalignedReadException, RecordCrcException, RecordNotFoundException
+from .vss_verbose import VerboseFlags
 
 import datetime
 def timestamp_to_datetime(timestamp:int):
@@ -281,14 +282,15 @@ class vss_record_header:
 			raise RecordNotFoundException("Unexpected record signature: expected=%s, actual=%s"
 					% (expected.decode(), self.signature.decode()))
 
-	def print(self, fd, indent:str=''):
+	def print(self, fd, indent:str='', verbose:VerboseFlags=VerboseFlags.RecordHeaders):
 		# The signature is printed as if it'a a two-character literal: characters reversed
 		print_str = "%sRECORD: '%c%c' - Length: 0x%X (%d) - Offset: %06X" % (
 			indent,
 			chr(self.signature[1]), chr(self.signature[0]),
 			self.length + self.LENGTH, self.length + self.LENGTH,
 			self.offset)
-		if self.signature != vss_comment_record.SIGNATURE:
+		if (verbose & VerboseFlags.RecordCrc) \
+			and self.signature != vss_comment_record.SIGNATURE:
 			print_str += " - CRC: %04X (%s: %04X)" % (
 				self.file_crc, "valid" if self.is_crc_valid() else "INVALID", self.actual_crc)
 		print(print_str, file=fd)
@@ -327,8 +329,9 @@ class vss_record:
 			s += ' (%s)' % (self.decode(physical_name))
 		return s
 
-	def print(self, fd, indent:str=''):
-		self.header.print(fd, indent)
+	def print(self, fd, indent:str='', verbose:VerboseFlags=VerboseFlags.RecordHeaders):
+		if verbose & VerboseFlags.RecordHeaders:
+			self.header.print(fd, indent, verbose)
 
 		if self.annotations:
 			print(indent + ('\n' + indent).join(self.annotations), file=fd)
@@ -360,8 +363,8 @@ class vss_branch_record(vss_record):
 		self.branch_file = self.reader.read_byte_string(12)
 		return
 
-	def print(self, fd, indent:str=''):
-		super().print(fd, indent)
+	def print(self, fd, indent:str='', verbose:VerboseFlags=VerboseFlags.RecordHeaders):
+		super().print(fd, indent, verbose)
 
 		print("%sPrev branch offset: %06X" % (indent, self.prev_branch_offset), file=fd)
 		print("%sBranch file: %s" % (indent, self.decode(self.branch_file)), file=fd)
@@ -405,8 +408,8 @@ class vss_checkout_record(vss_record):
 
 		return
 
-	def print(self, fd, indent:str=''):
-		super().print(fd, indent)
+	def print(self, fd, indent:str='', verbose:VerboseFlags=VerboseFlags.RecordHeaders):
+		super().print(fd, indent, verbose)
 
 		print("%sUser: %s @ %s" % (indent, self.decode(self.user), timestamp_to_datetime(self.timestamp)), file=fd)
 		print("%sWorking: %s" % (indent, self.decode(self.working_dir)), file=fd)
@@ -438,8 +441,8 @@ class vss_comment_record(vss_record):
 		self.comment = self.reader.read_string(self.header.length)
 		return
 
-	def print(self, fd, indent:str=''):
-		super().print(fd, indent)
+	def print(self, fd, indent:str='', verbose:VerboseFlags=VerboseFlags.RecordHeaders):
+		super().print(fd, indent, verbose)
 
 		print("%sComment: %s" % (indent, indent_string(self.comment, indent + '         ')), file=fd)
 		return
@@ -462,8 +465,8 @@ class vss_project_record(vss_record):
 		self.project_file = self.reader.read_byte_string(12)
 		return
 
-	def print(self, fd, indent:str=''):
-		super().print(fd, indent)
+	def print(self, fd, indent:str='', verbose:VerboseFlags=VerboseFlags.RecordHeaders):
+		super().print(fd, indent, verbose)
 
 		print("%sPrev project offset: %06X" % (indent, self.prev_project_offset), file=fd)
 		print("%sProject file: %s" % (indent, self.decode(self.project_file)), file=fd)
@@ -496,8 +499,10 @@ class vss_delta_operation:
 		if self.command == self.DeltaCommandWriteSuccessor:
 			return base_data[self.offset:self.offset+self.length]
 
-	def print(self, fd, indent:str=''):
+	def print(self, fd, indent:str='', verbose:VerboseFlags=VerboseFlags.VerboseNone):
 		print("%s%d: Offset=%06X Length=%06X" % (indent, self.command, self.offset, self.length), file=fd)
+		if verbose & VerboseFlags.DeltaData:
+			...		# TODO
 		return
 
 class vss_delta_record(vss_record):
@@ -525,8 +530,9 @@ class vss_delta_record(vss_record):
 	def apply_delta(self, base_data):
 		return bytes().join(op.apply(base_data) for op in self.delta_operations)
 
-	def print(self, fd, indent:str=''):
-		super().print(fd, indent)
-		for op in self.delta_operations:
-			op.print(fd, indent)
+	def print(self, fd, indent:str='', verbose:VerboseFlags=VerboseFlags.RecordHeaders):
+		super().print(fd, indent, verbose)
+		if verbose & VerboseFlags.DeltaItems:
+			for op in self.delta_operations:
+				op.print(fd, verbose)
 		return

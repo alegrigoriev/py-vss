@@ -16,6 +16,7 @@ from __future__ import annotations
 import struct
 from .vss_record import *
 from .vss_exception import UnrecognizedRevActionException
+from .vss_verbose import VerboseFlags
 from enum import IntEnum
 
 class VssRevisionAction(IntEnum):
@@ -93,8 +94,8 @@ class vss_revision_record(vss_record):
 		self.label = zero_terminated(label)
 		return
 
-	def print(self, fd, indent:str=''):
-		super().print(fd, indent)
+	def print(self, fd, indent:str='', verbose:VerboseFlags=VerboseFlags.RecordHeaders):
+		super().print(fd, indent, verbose)
 
 		print("%sRevision: %d" % (indent, self.revision_num), file=fd)
 		print("%sBy: '%s', at: %s (%d)" % (indent, self.decode(self.user), timestamp_to_datetime(self.timestamp), self.timestamp), file=fd)
@@ -111,8 +112,8 @@ class vss_revision_record(vss_record):
 
 class vss_label_revision_record(vss_revision_record):
 
-	def print(self, fd, indent:str=''):
-		super().print(fd, indent)
+	def print(self, fd, indent:str='', verbose:VerboseFlags=VerboseFlags.Records):
+		super().print(fd, indent, verbose)
 
 		print("%sLabel: %s" % (indent, self.decode(self.label)), file=fd)
 		return
@@ -133,8 +134,8 @@ class vss_common_revision_record(vss_revision_record):
 		self.physical = self.reader.read_byte_string(10)
 		return
 
-	def print(self, fd, indent:str=''):
-		super().print(fd, indent)
+	def print(self, fd, indent:str='', verbose:VerboseFlags=VerboseFlags.RecordHeaders):
+		super().print(fd, indent, verbose)
 
 		print("%sName: %s" % (indent, self.decode_name(self.name, self.physical)), file=fd)
 		return
@@ -159,8 +160,8 @@ class vss_destroy_revision_record(vss_revision_record):
 		self.physical = self.reader.read_byte_string(10)
 		return
 
-	def print(self, fd, indent:str=''):
-		super().print(fd, indent)
+	def print(self, fd, indent:str='', verbose:VerboseFlags=VerboseFlags.RecordHeaders):
+		super().print(fd, indent, verbose)
 
 		if self.was_deleted:
 			print("%sPreviously deleted: %d" % (indent, self.was_deleted), file=fd)
@@ -185,8 +186,8 @@ class vss_rename_revision_record(vss_revision_record):
 		self.physical = self.reader.read_byte_string(10)
 		return
 
-	def print(self, fd, indent:str=''):
-		super().print(fd, indent)
+	def print(self, fd, indent:str='', verbose:VerboseFlags=VerboseFlags.RecordHeaders):
+		super().print(fd, indent, verbose)
 
 		print("%sName: %s -> %s" % (indent, self.decode_name(self.old_name),
 								self.decode_name(self.name, self.physical)), file=fd)
@@ -210,8 +211,8 @@ class vss_move_revision_record(vss_revision_record):
 		self.physical = self.reader.read_byte_string(10)
 		return
 
-	def print(self, fd, indent:str=''):
-		super().print(fd, indent)
+	def print(self, fd, indent:str='', verbose:VerboseFlags=VerboseFlags.RecordHeaders):
+		super().print(fd, indent, verbose)
 
 		print("%sProject path: %s" % (indent, self.decode(self.project_path)), file=fd)
 		print("%sName: %s" % (indent, self.decode_name(self.name, self.physical)), file=fd)
@@ -246,8 +247,8 @@ class vss_share_revision_record(vss_revision_record):
 		self.physical = reader.read_byte_string(10)
 		return
 
-	def print(self, fd, indent:str=''):
-		super().print(fd, indent)
+	def print(self, fd, indent:str='', verbose:VerboseFlags=VerboseFlags.RecordHeaders):
+		super().print(fd, indent, verbose)
 
 		print("%sName: %s" % (indent, self.decode_name(self.name, self.physical)), file=fd)
 		print("%sShare from path: %s" % (indent, self.decode(self.project_path)), file=fd)
@@ -272,8 +273,8 @@ class vss_branch_revision_record(vss_common_revision_record):
 		self.branch_file = self.reader.read_byte_string(10)
 		return
 
-	def print(self, fd, indent:str=''):
-		super().print(fd, indent)
+	def print(self, fd, indent:str='', verbose:VerboseFlags=VerboseFlags.RecordHeaders):
+		super().print(fd, indent, verbose)
 
 		print("%sBranched from file: %s" % (indent, self.decode(self.branch_file)), file=fd)
 		return
@@ -299,8 +300,8 @@ class vss_checkin_revision_record(vss_revision_record):
 
 		return
 
-	def print(self, fd, indent:str=''):
-		super().print(fd, indent)
+	def print(self, fd, indent:str='', verbose:VerboseFlags=VerboseFlags.RecordHeaders):
+		super().print(fd, indent, verbose)
 
 		print("%sPrev delta offset: %06X" % (indent, self.prev_delta_offset), file=fd)
 		if self.filler:
@@ -325,8 +326,8 @@ class vss_archive_restore_revision_record(vss_common_revision_record):
 		# NOTE: Two more words in the record may be meaningful
 		return
 
-	def print(self, fd, indent:str=''):
-		super().print(fd, indent)
+	def print(self, fd, indent:str='', verbose:VerboseFlags=VerboseFlags.RecordHeaders):
+		super().print(fd, indent, verbose)
 
 		if self.filler16:
 			print("%sFiller: %04X" % (indent, self.filler16), file=fd)
