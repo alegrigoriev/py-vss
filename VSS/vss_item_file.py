@@ -13,12 +13,13 @@
 #   limitations under the License.
 
 from __future__ import annotations
-from typing import Tuple, List
+from typing import Tuple, List, Iterator
 
-from .vss_exception import EndOfBufferException, BadHeaderException
+from .vss_exception import EndOfBufferException, BadHeaderException, ArgumentOutOfRangeException
 from .vss_record import *
 from .vss_record_file import vss_record_file
 from .vss_record_factory import vss_item_record_factory
+from .vss_revision_record import vss_revision_record
 
 from enum import IntEnum, IntFlag
 
@@ -270,17 +271,27 @@ class vss_item_file(vss_record_file):
 		# Fill the record dictionary
 		self.read_all_records(vss_item_record_factory, last_offset=self.header.eof_offset)
 
+		self.revisions:List[vss_revision] = []
 		return
 
 	def get_data_file_name(self)->str:
 		data_file_suffix = self.header.data_ext.decode(encoding='ansi')
 		return self.filename + data_file_suffix
 
+	def all_revisions(self)->Iterator[vss_revision]:
+		return iter(self.revisions)
+
+	def get_last_revision_num(self):
+		return self.header.num_revisions
+
 	def print(self, fd):
 
 		print("Item file %s, size: %06X" % (self.filename, self.file_size), file=fd)
 		super().print(fd)
 
+		for revision in self.revisions:
+			print('', file=fd)	# insert an empty line
+			revision.print(fd)
 		return
 
 class vss_project_item_file(vss_item_file):
@@ -290,10 +301,37 @@ class vss_project_item_file(vss_item_file):
 		super().__init__(database, filename, vss_project_header_record)
 		self.header:vss_project_header_record
 
+		self.build_revisions(database)
 		return
 
 	def is_project(self):
 		return True
+
+	# Read revisions in reverse order from last to first
+	def build_revisions(self, database):
+		# pre-allocate the revision array
+		self.revisions = [None] * self.header.num_revisions
+		offset = self.header.last_revision_offset
+		# In-method imports are used to prevent circular dependencies
+		from .vss_revision import vss_project_revision_factory
+		while offset > 0:
+			record:vss_revision_record
+			record = self.get_record(offset)
+			revision = vss_project_revision_factory(record, database, self)
+
+			self.revisions[revision.revision_num-1] = revision
+			# Continue from the new position
+			offset = record.prev_rev_offset
+			continue
+		return
+
+	def get_revision(self, version:int)->vss_revision:
+		if version < 1 or version > self.header.num_revisions:
+			raise ArgumentOutOfRangeException("version", version, "Invalid version number")
+		if not self.revisions:
+			return None
+		# Projects (directories) don't branch.
+		return self.revisions[version-1]
 
 class vss_file_item_file(vss_item_file):
 	# 'first_letter_subdirectory' argument is not used: it's always True.
@@ -301,7 +339,15 @@ class vss_file_item_file(vss_item_file):
 	def __init__(self, database, filename:str, first_letter_subdirectory):
 		super().__init__(database, filename, vss_file_header_record)
 		self.header:vss_file_header_record
+		with database.open_data_file(self.get_data_file_name()) as file:
+			self.last_data = file.read()
 
+		if self.header.branch_file:
+			self.branch_parent = database.open_records_file(vss_file_item_file,
+														self.header.branch_file)
+		else:
+			self.branch_parent:vss_file_item_file = None
+		self.build_revisions(database, self.last_data)
 		return
 
 	def is_project(self):
@@ -322,8 +368,64 @@ class vss_file_item_file(vss_item_file):
 	def is_checked_out(self):
 		return (self.header.flags & FileHeaderFlags.CheckedOut) != 0
 
+	# Read revisions in reverse order from last to first
+	def build_revisions(self, database, data:bytes):
+		first_revision:int = self.header.first_revision
+		# pre-allocate the revision array
+		self.revisions = [None] * (self.header.num_revisions - (first_revision-1))
+		offset = self.header.last_revision_offset
+		prev_data = data
+		# In-method imports are used to prevent circular dependencies
+		from .vss_revision import vss_file_revision_factory
+		from .vss_revision_record import VssRevisionAction
+		while offset > 0:
+			record:vss_revision_record
+			record = self.get_record(offset)
+			revision = vss_file_revision_factory(record, database, self)
+			self.revisions[revision.revision_num-first_revision] = revision
+
+			# If the file was added as empty, and the non-empty message is present,
+			# Use the second revision's data for the first revision
+			if revision.revision_num == 1 \
+				and len(data) == 0:
+				data = prev_data
+			elif record.action == VssRevisionAction.CheckinFile:
+				prev_data = data
+
+			data = revision.set_revision_data(data)
+
+			# Continue from the new position
+			offset = record.prev_rev_offset
+			continue
+
+		return
+
+	def get_revision(self, version:int)->vss_revision:
+		if not self.revisions:
+			return None
+		if version < 1 or version > self.header.num_revisions:
+			raise ArgumentOutOfRangeException("version", version, "Invalid version number")
+		if version >= self.header.first_revision:
+			return self.revisions[version - self.header.first_revision]
+		if self.branch_parent is None or self.branch_parent is NotImplemented:
+			# NotImplemented can be returned in case of dependency cycle
+			return None
+		return self.branch_parent.get_revision(version)
+
+	def get_revision_data(self, version:int)->bytes:
+		revision = self.get_revision(version)
+		if revision is None:
+			return None
+		if revision.revision_data is None:
+			return b''
+		return revision.revision_data
+
 	def print(self, fd):
 		super().print(fd)
+
+		crc = crc32.calculate(self.last_data)
+		if crc != self.header.data_crc:
+			print("header.data_crc=%08X, calculated: %08X" % (self.header.data_crc, crc), file=fd)
 
 		offset = self.header.project_offset
 		if offset != 0:

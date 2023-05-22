@@ -48,6 +48,9 @@ class vss_database:
 	def __init__(self, path:str, encoding='mbcs'):
 		self.base_path:str = path
 		self.encoding = encoding
+		self.index_name_dict = {}
+		self.physical_name_dict = {}
+		self.logical_name_dict = {}
 
 		self.ini_path:Path = Path(path, "srcsafe.ini")
 
@@ -104,14 +107,36 @@ class vss_database:
 		self.record_files_by_physical[physical_name] = file
 		return file
 
-	def get_long_name(self, name:vss_name):
-		if name.name_file_offset == 0:
-			return name.short_name
+	def get_long_name(self, name:vss_name) -> str:
+		logical_name = name.short_name
+		if name.name_file_offset != 0:
+			name_record = self.name_file.get_name_record(name.name_file_offset)
+			logical_name = name_record.get(
+						name_record.NameKind.Project if name.is_project() else name_record.NameKind.Long,
+						logical_name)
+		long_name:str = self.logical_name_dict.get(logical_name, None)
+		if long_name is None:
+			long_name = logical_name.decode(self.encoding)
+			self.logical_name_dict[logical_name] = long_name
+		return long_name
 
-		name_record = self.name_file.get_name_record(name.name_file_offset)
-		return name_record.get(
-					name_record.NameKind.Project if name.is_project() else name_record.NameKind.Long,
-					name.short_name)
+	def get_index_name(self, short_name:bytes) -> bytes:
+		# This name is used for case-insensitive indexing in the project items, even if short_name is empty.
+		# VSS sorts the directory by lowercased short name byte values.
+		# For proper sort, index_name needs to be 'bytes', because Unicode points may be in different sorting order
+		index_name:bytes = self.index_name_dict.get(short_name)
+		if index_name is None:
+			index_name = short_name.decode(self.encoding).lower().encode(self.encoding)
+			self.index_name_dict[short_name] = index_name
+		return index_name
+
+	def get_physical_name(self, physical_name:bytes) -> str:
+		physical_name = physical_name.upper()
+		decoded_name:str = self.physical_name_dict.get(physical_name)
+		if decoded_name is None:
+			decoded_name = physical_name.decode('ascii')
+			self.physical_name_dict[physical_name] = decoded_name
+		return decoded_name
 
 	def print(self, fd):
 		print('Database:', self.base_path, file=fd)

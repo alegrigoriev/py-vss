@@ -369,6 +369,12 @@ using `vss_item_record_factory` record factory.
 - makes the data file name from its own filename and datafile extension taken from the header.
 The datafile extension is a single letter which alternates at every update to the data file.
 
+`all_revisions(self)`
+- returns an iterator for all revisions, in chronological order
+
+`get_last_revision_num(self)`
+- returns the last revision for this item file
+
 ### class `vss_project_item_file`
 
 This class manages project item files, which store directory revisions. It has the following methods:
@@ -378,6 +384,13 @@ This class manages project item files, which store directory revisions. It has t
 
 `is_project(self)`
 - returns `True`.
+
+`build_revisions(self)`
+- internal method to make a revision array by calling `vss_project_revision_factory` function for each revision record (log entry).
+
+`get_revision(self, version:int)`
+- returns a vss_revision object for the given version number.
+If the version number is out of bounds, it raises `ArgumentOutOfRangeException` exception.
 
 ### class `vss_file_item_file`
 
@@ -392,6 +405,16 @@ This class manages file item files, which store file revisions. It has the follo
 `is_locked(self)`, `is_binary(self)`, `is_latest_only(self)`, `is_shared(self)`, `is_checked_out(self)`
 - return `True` or `False`, depending on flag set in the header.
 
+`build_revisions(self, data:bytes)`
+- internal method to make a revision array by calling `vss_file_revision_factory` function for each revision record (log entry).
+`data` if the final data blob.
+The function returns the resulting data blob for the very first revision (possibly at the branch point).
+
+`get_revision(self, version:int)`
+- returns a vss_revision object for the given version number. If the version number is out of bounds,
+it raises `ArgumentOutOfRangeException` exception. If the version number precedes the branching point,
+it opens the branch parent file and forwards the call to that file.
+
 ## File `VSS/vss_item.py`
 
 The file contains classes to represent logical items: projects (directories) and files in those
@@ -403,10 +426,10 @@ class `vss_item`
 - common base class for project item and file item;
 
 class `vss_project`
-- a class to manage logical directory (project).
+- manages a logical directory (project).
 
 class `vss_file`
-- a class to manage a logical file.
+- manages a logical file.
 
 ### class `vss_item`
 
@@ -447,3 +470,42 @@ The class is derived from `vss_item` and implements the following methods:
 `is_pinned(self)`, `is_locked(self)`, `is_binary(self)`, `is_latest_only(self)`, `is_shared(self)`, `is_checked_out(self)`
 - Returns flags state of its item file.
 
+## File `VSS/vss_revision.py`
+
+The file contains classes to represent revision objects of different type,
+and also factory functions to make an action-specific revision object
+from a revision record.
+
+The following classes and functions are defined:
+
+class `vss_full_name`
+- the class encapsulates name information for a VSS item: physical name for the item file.
+
+class `vss_revision`
+- common base class for action-specific revision classes.
+
+function `vss_file_revision_factory(record:vss_revision_record, database,
+item_file:vss_file_item_file)`
+- factory function to make a _file_ item revision object out of a revision record.
+
+function `vss_project_revision_factory(record:vss_revision_record, database,
+item_file:vss_project_item_file)`
+- factory function to make a _project_ item revision object out of a revision record.
+
+### class `vss_revision`
+
+It's a base class which encapsulates logical data of a revision.
+
+The class defines the following methods:
+
+`__init__(self, record:vss_revision_record, database, item_file:vss_item_file)`
+- class constructor. It can fetch additional records for comment and label comment.
+
+`set_revision_data(self, data:bytes)`
+- sets the data blob for this _file_ revision, and returns the data blob to be used for the preceding revision.
+The base class function only returns same `data` blob.
+`vss_checkin_revision` applies the delta record to the blob to produce the blob for previous revision.
+
+`print(self, fd)`
+- The function prints the revision data to `fd` file object as text formatted lines.
+The base class prints a generic revision header.
