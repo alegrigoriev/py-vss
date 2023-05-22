@@ -61,8 +61,12 @@ class `vss_project_record`
 A file can be cloned (shared) to multiple projects (directories).
 Multiple project records can be present, linked by `prev_project_offset` field.
 
+class `vss_delta_operation`
+- implements an element of delta array. Implements methods to read and apply such an element.
+
 class `vss_delta_record`
 - represents delta (difference) of the previous revision of the file from the next revision.
+Implements a function to apply the delta array to the data blob.
 
 ### class `vss_record_reader`
 

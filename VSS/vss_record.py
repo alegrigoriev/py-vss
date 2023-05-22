@@ -20,6 +20,7 @@ import struct
 if sys.version_info < (3, 9):
 	sys.exit("vss2git: This package requires Python 3.9+")
 
+from typing import List
 from .vss_exception import EndOfBufferException, UnalignedReadException, RecordCrcException, RecordNotFoundException
 
 import datetime
@@ -467,6 +468,64 @@ class vss_project_record(vss_record):
 		print("  Project file: %s" % (self.decode(self.project_file)), file=fd)
 		return
 
+class vss_delta_operation:
+	DeltaCommandWriteLog = 0
+	DeltaCommandWriteSuccessor = 1
+	DeltaCommandStop = 2
+	unpack_format = struct.Struct(b'<HHII')
+
+	def __init__(self, reader:vss_record_reader):
+
+		(
+			self.command,
+			skip,
+			self.offset,
+			self.length,
+		) = reader.unpack(self.unpack_format)
+
+		if self.command == self.DeltaCommandWriteLog:
+			self.data = reader.read_bytes(self.length)
+		else:
+			self.data:bytes = None
+		return
+
+	def apply(self, base_data):
+		if self.command == self.DeltaCommandWriteLog:
+			return self.data
+		if self.command == self.DeltaCommandWriteSuccessor:
+			return base_data[self.offset:self.offset+self.length]
+
+	def print(self, fd):
+		print("    %d: Offset=%06X Length=%06X" % (self.command, self.offset, self.length), file=fd)
+		return
+
 class vss_delta_record(vss_record):
 
 	SIGNATURE = b"FD"
+
+	def __init__(self, header:vss_record_header):
+		super().__init__(header)
+
+		self.delta_operations:List[vss_delta_operation] = []
+		return
+
+	def read(self):
+		super().read()
+		reader = self.reader
+
+		while True:
+			op = vss_delta_operation(reader)
+
+			if op.command == op.DeltaCommandStop:
+				break
+			self.delta_operations.append(op)
+		return
+
+	def apply_delta(self, base_data):
+		return bytes().join(op.apply(base_data) for op in self.delta_operations)
+
+	def print(self, fd):
+		super().print(fd)
+		for op in self.delta_operations:
+			op.print(fd)
+		return
