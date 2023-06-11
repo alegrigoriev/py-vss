@@ -53,6 +53,13 @@ class vss_action:
 	def apply_to_item_backwards(self, action_item):
 		return
 
+	# The function calls functions of the invocation-specific revision action handler
+	# to create, modify, label, delete files and directories.
+	# For example, such an action handler can convert the actions
+	# to Git invocations
+	def perform_revision_action(self, revision_action_handler):
+		return
+
 # Action on a project file with name
 class named_action(vss_action):
 
@@ -83,8 +90,16 @@ class label_action(vss_action):
 class label_file_action(label_action):
 	project_action = False
 
+	def perform_revision_action(self, revision_action_handler):
+		revision_action_handler.create_file_label(path=self.pathname, label=self.label)
+		return
+
 class label_project_action(label_action):
 	project_action = True
+
+	def perform_revision_action(self, revision_action_handler):
+		revision_action_handler.create_dir_label(path=self.pathname, label=self.label)
+		return
 
 class add_item_action(named_action):
 
@@ -97,6 +112,9 @@ class add_item_action(named_action):
 		if item.item_file is None:
 			self.add_error_string("%s %s could not be added: file %s missing" %
 					(self.Project_or_File(), self.pathname, self.physical_name))
+		elif self.project_action:
+			# If item file is present, the directory will be created by CreateProject
+			self.perform_revision_action = super().perform_revision_action
 		return
 
 class add_file_action(add_item_action):
@@ -109,6 +127,10 @@ class add_project_action(add_item_action):
 	ACTION_STR = "Add Project"
 	project_action = True
 
+	def perform_revision_action(self, revision_action_handler):
+		revision_action_handler.create_directory(path=self.pathname)
+		return
+
 class delete_item_action(named_action):
 
 	def apply_to_item_backwards(self, action_item):
@@ -118,6 +140,8 @@ class delete_item_action(named_action):
 		if item.item_file is None:
 			self.add_error_string("%s %s could not be deleted: file %s missing" %
 					(self.Project_or_File(), self.pathname, self.physical_name))
+			if not self.project_action:
+				self.perform_revision_action = super().perform_revision_action
 		return
 
 class delete_file_action(delete_item_action):
@@ -125,10 +149,18 @@ class delete_file_action(delete_item_action):
 	ACTION_STR = "Delete File"
 	project_action = False
 
+	def perform_revision_action(self, revision_action_handler):
+		revision_action_handler.delete_file(path=self.pathname)
+		return
+
 class delete_project_action(delete_item_action):
 
 	ACTION_STR = "Delete Project"
 	project_action = True
+
+	def perform_revision_action(self, revision_action_handler):
+		revision_action_handler.delete_directory(path=self.pathname)
+		return
 
 class file_create_action(vss_action):
 
@@ -142,6 +174,11 @@ class file_create_action(vss_action):
 		self.physical_name = action_item.physical_name	# For __str__
 		action_item.next_revision = None
 		action_item.parent.remove_from_directory(action_item)
+		return
+
+	def perform_revision_action(self, revision_action_handler):
+		revision_action_handler.create_file(path=self.pathname,
+						data=self.revision.revision_data)
 		return
 
 class project_create_action(vss_action):
@@ -160,8 +197,14 @@ class project_create_action(vss_action):
 		# This may happen if some of its projects has been restored from an archive
 		if action_item.parent is not None:
 			action_item.parent.remove_from_directory(action_item)
-			# 'parent' is None for the root project
+		else:
+			# 'parent' is None for the root project, don't call "create_directory"
+			self.perform_revision_action = super().perform_revision_action
 		action_item.parent = None
+		return
+
+	def perform_revision_action(self, revision_action_handler):
+		revision_action_handler.create_directory(path=self.pathname)
 		return
 
 class recover_file_action(named_action):
@@ -176,8 +219,13 @@ class recover_file_action(named_action):
 		if item.item_file is None:
 			self.add_error_string("File %s could not be recovered: file %s missing"
 					% (self.pathname, self.physical_name))
+			self.perform_revision_action = super().perform_revision_action
 		else:
 			self.data = item.get_next_revision_data()
+		return
+
+	def perform_revision_action(self, revision_action_handler):
+		revision_action_handler.create_file(path=self.pathname, data=self.data)
 		return
 
 class recover_project_action(named_action):
@@ -205,10 +253,20 @@ class recover_project_action(named_action):
 		if item.item_file is None:
 			self.add_error_string("Project %s could not be recovered: file %s missing"
 					% (self.pathname, self.physical_name))
+			self.tree_list = [ (self.pathname, None) ]
 			return
 		# Build and save the tree to be recovered.
 		# It can't be done at the time of perform_revision_action call
 		self.tree_list = self.recover_directory(item)
+		return
+
+	def perform_revision_action(self, revision_action_handler):
+		for path, data in self.tree_list:
+			if data is None:
+				revision_action_handler.create_directory(path=path)
+			else:
+				revision_action_handler.create_file(path=path, data=data)
+			continue
 		return
 
 class destroy_action(named_action):
@@ -223,8 +281,15 @@ class destroy_action(named_action):
 						self.project_action, ProjectEntryFlag.Deleted if self.was_deleted else 0,
 						start_timestamp=self.timestamp, item_idx=self.item_index)
 		if item.item_file is None:
-			self.add_error_string("Destroyed item %s could not be reinserted: file %s missing"
+			self.add_error_string("Destroyed item %s could not be traced back: file %s missing"
 								% (self.pathname, self.physical_name))
+			if not self.project_action or self.was_deleted:
+				# The file has never been created, or the directory already deleted
+				self.perform_revision_action = super().perform_revision_action
+			# else: A directory
+		elif self.was_deleted:
+			# The directory/file has already been deleted
+			self.perform_revision_action = super().perform_revision_action
 		return
 
 class destroy_project_action(destroy_action):
@@ -232,10 +297,20 @@ class destroy_project_action(destroy_action):
 	ACTION_STR = "Destroy Project"
 	project_action = True
 
+	def perform_revision_action(self, revision_action_handler):
+		# If the item still t exists, delete it
+		revision_action_handler.delete_directory(path=self.pathname)
+		return
+
 class destroy_file_action(destroy_action):
 
 	ACTION_STR = "Destroy File"
 	project_action = False
+
+	def perform_revision_action(self, revision_action_handler):
+		# If the item still t exists, delete it
+		revision_action_handler.delete_file(path=self.pathname)
+		return
 
 class rename_action(named_action):
 
@@ -256,7 +331,12 @@ class rename_action(named_action):
 
 		if item.item_file is None:
 			self.add_error_string('Rename: physical name %s not present in the database' % (self.physical_name))
-		elif not item.is_deleted():
+			if not self.project_action:
+				self.perform_revision_action = super().perform_revision_action
+		elif item.is_deleted():
+			# Note that when a shared file is renamed, *all* its shared instances are renamed, even marked deleted
+			self.perform_revision_action = super().perform_revision_action
+		else:
 			# We need to remove and reinsert the item in the pending list,
 			# because its sort by name position may change among items with same timestamp
 			action_item.remove_pending_item(item)
@@ -270,8 +350,16 @@ class rename_action(named_action):
 class rename_file_action(rename_action):
 	project_action = False
 
+	def perform_revision_action(self, revision_action_handler):
+		revision_action_handler.rename_file(old_path=self.original_pathname, new_path=self.pathname)
+		return
+
 class rename_project_action(rename_action):
 	project_action = True
+
+	def perform_revision_action(self, revision_action_handler):
+		revision_action_handler.rename_directory(old_path=self.original_pathname, new_path=self.pathname)
+		return
 
 class move_from_action(named_action):
 	project_action = True
@@ -289,6 +377,10 @@ class move_from_action(named_action):
 
 		if item.item_file is not None:
 			action_item.remove_pending_item(item)
+		return
+
+	def perform_revision_action(self, revision_action_handler):
+		revision_action_handler.rename_directory(old_path=self.original_pathname, new_path=self.pathname)
 		return
 
 	def __str__(self):
@@ -312,6 +404,10 @@ class move_to_action(named_action):
 								% (self.pathname, self.physical_name))
 		return
 
+	def perform_revision_action(self, revision_action_handler):
+		revision_action_handler.rename_directory(old_path=self.pathname, new_path=self.new_pathname)
+		return
+
 	def __str__(self):
 		return "Move %s to %s" % (self.pathname, self.new_pathname)
 
@@ -333,6 +429,7 @@ class share_action(named_action):
 		if item.item_file is None:
 			self.add_error_string("File %s could not be shared: file %s missing"
 								% (self.pathname, self.physical_name))
+			self.perform_revision_action = super().perform_revision_action
 			return
 
 		action_item.remove_pending_item(item)
@@ -341,6 +438,10 @@ class share_action(named_action):
 		item = action_item.find_by_path_name(self.original_project)
 		if item is None or item.item_file is None:
 			self.original_pathname = None
+		return
+
+	def perform_revision_action(self, revision_action_handler):
+		revision_action_handler.create_file(path=self.pathname, data=self.data, copy_from=self.original_pathname)
 		return
 
 	def __str__(self):
@@ -364,6 +465,11 @@ class pin_action(named_action):
 		else:
 			self.add_error_string("File %s could not be pinned: file %s missing"
 								% (self.pathname, self.physical_name))
+			self.perform_revision_action = super().perform_revision_action
+		return
+
+	def perform_revision_action(self, revision_action_handler):
+		revision_action_handler.change_file(path=self.pathname, data=self.data)
 		return
 
 	def __str__(self):
@@ -387,6 +493,11 @@ class unpin_action(named_action):
 		else:
 			self.add_error_string("File %s could not be unpinned: file %s missing"
 								% (self.pathname, self.physical_name))
+			self.perform_revision_action = super().perform_revision_action
+		return
+
+	def perform_revision_action(self, revision_action_handler):
+		revision_action_handler.change_file(path=self.pathname, data=self.data)
 		return
 
 	def __str__(self):
@@ -437,6 +548,10 @@ class create_branch_action(vss_action):
 		action_item.next_revision = None
 		return
 
+	def perform_revision_action(self, revision_action_handler):
+		revision_action_handler.change_file(path=self.pathname, data=self.data)
+		return
+
 	def __str__(self):
 		return "Create Branch %s from %s" % (self.pathname, self.branch_file)
 
@@ -448,6 +563,10 @@ class checkin_action(vss_action):
 	def __init__(self, revision:vss_checkin_revision, base_path:str):
 		super().__init__(revision, base_path)
 		self.data = revision.revision_data
+		return
+
+	def perform_revision_action(self, revision_action_handler):
+		revision_action_handler.change_file(path=self.pathname, data=self.data)
 		return
 
 class archive_restore_action(named_action):
@@ -477,6 +596,9 @@ class restore_action(archive_restore_action):
 		if item.item_file is None:
 			self.add_error_string("%s %s could not be restored: file %s missing"
 							% (self.Project_or_File(), self.pathname, self.physical_name))
+		elif self.project_action:
+			# If the project file is present, the directory will be created by its CreateProject
+			self.perform_revision_action = super().perform_revision_action
 		return
 
 	def __str__(self):
@@ -487,6 +609,10 @@ class restore_file_action(restore_action):
 
 class restore_project_action(restore_action):
 	project_action = True
+
+	def perform_revision_action(self, revision_action_handler):
+		revision_action_handler.create_directory(path=self.pathname)
+		return
 
 file_action_dict = {
 	int(VssRevisionAction.Label) : label_file_action,

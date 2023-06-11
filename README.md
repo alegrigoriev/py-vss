@@ -593,6 +593,12 @@ It also defines the following methods:
 - applies its own action to `action_context`.
 Such actions could be add, delete, rename a specified file or a directory, and others.
 
+`perform_revision_action(self, revision_action_handler)`
+- The function calls functions of the invocation-specific `revision_action_handler`
+to create, modify, label, delete files and directories.
+For example, such an action handler can convert the actions to Git invocations,
+by calling `add_file`, `change_file` and other such methods of `revision_action_handler`.
+
 `__str__(self)`
 - returns a string describing this action. The default implementation combines `ACTION_STR` and file name into a string.
 
