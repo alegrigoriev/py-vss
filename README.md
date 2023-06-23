@@ -589,6 +589,10 @@ It also defines the following methods:
 `add_error_string(self, error_str)`
 - adds the given error string to a list in this object, to be emitted to the actions log.
 
+`apply_to_item_backwards(self, action_context)`
+- applies its own action to `action_context`.
+Such actions could be add, delete, rename a specified file or a directory, and others.
+
 `__str__(self)`
 - returns a string describing this action. The default implementation combines `ACTION_STR` and file name into a string.
 

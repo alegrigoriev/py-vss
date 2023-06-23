@@ -15,6 +15,7 @@
 from __future__ import annotations
 from .vss_revision import *
 from .vss_exception import UnrecognizedRevActionException
+from .vss_item import ProjectEntryFlag
 
 class vss_action:
 
@@ -47,6 +48,11 @@ class vss_action:
 			return 'Project'
 		return 'File'
 
+	# The changelist is reconstructed from the most recent state of the project tree
+	# back in time. This call reverses the revision being processed
+	def apply_to_item_backwards(self, action_item):
+		return
+
 # Action on a project file with name
 class named_action(vss_action):
 
@@ -54,6 +60,14 @@ class named_action(vss_action):
 		super().__init__(revision, base_path, revision.full_name.name)
 		self.physical_name = revision.full_name.physical_name
 		self.item_index = revision.item_index
+		return
+
+	def assert_valid_item(self, item, name=None, physical_name=None):
+		if name is None:
+			name = self.logical_name
+		if physical_name is None:
+			physical_name = self.physical_name
+		assert(item is not None and item.physical_name == physical_name and item.logical_name == name)
 		return
 
 class label_action(vss_action):
@@ -73,7 +87,17 @@ class label_project_action(label_action):
 	project_action = True
 
 class add_item_action(named_action):
-	...
+
+	def apply_to_item_backwards(self, action_item):
+		# In some conditions AddProject action can come before all its child history completes
+		# (later on the timeline).
+		item = action_item.remove_item_by_index(self.item_index, remove_from_directory=False)
+		self.assert_valid_item(item)
+
+		if item.item_file is None:
+			self.add_error_string("%s %s could not be added: file %s missing" %
+					(self.Project_or_File(), self.pathname, self.physical_name))
+		return
 
 class add_file_action(add_item_action):
 
@@ -86,7 +110,15 @@ class add_project_action(add_item_action):
 	project_action = True
 
 class delete_item_action(named_action):
-	...
+
+	def apply_to_item_backwards(self, action_item):
+		item = action_item.unset_item_deleted(self.item_index, self.timestamp)
+		self.assert_valid_item(item)
+
+		if item.item_file is None:
+			self.add_error_string("%s %s could not be deleted: file %s missing" %
+					(self.Project_or_File(), self.pathname, self.physical_name))
+		return
 
 class delete_file_action(delete_item_action):
 
@@ -106,6 +138,12 @@ class file_create_action(vss_action):
 	ACTION_STR = "Create File"
 	project_action = False
 
+	def apply_to_item_backwards(self, action_item):
+		self.physical_name = action_item.physical_name	# For __str__
+		action_item.next_revision = None
+		action_item.parent.remove_from_directory(action_item)
+		return
+
 class project_create_action(vss_action):
 
 	# CreateProject action is normally the first in the directory item.
@@ -114,21 +152,79 @@ class project_create_action(vss_action):
 	ACTION_STR = "Create Project"
 	project_action = True
 
+	def apply_to_item_backwards(self, action_item):
+		self.physical_name = action_item.physical_name	# For __str__
+		action_item.next_revision = None
+		# In some conditions CreateProject action can come later on the timeline,
+		# before all its child history completes.
+		# This may happen if some of its projects has been restored from an archive
+		if action_item.parent is not None:
+			action_item.parent.remove_from_directory(action_item)
+			# 'parent' is None for the root project
+		action_item.parent = None
+		return
+
 class recover_file_action(named_action):
 
 	ACTION_STR = "Recover File"
 	project_action = False
+
+	def apply_to_item_backwards(self, action_item):
+		item = action_item.set_item_deleted(self.item_index)
+		self.assert_valid_item(item)
+
+		if item.item_file is None:
+			self.add_error_string("File %s could not be recovered: file %s missing"
+					% (self.pathname, self.physical_name))
+		else:
+			self.data = item.get_next_revision_data()
+		return
 
 class recover_project_action(named_action):
 
 	ACTION_STR = "Recover Project"
 	project_action = True
 
+	# Recreate previously deleted files and directories recursively
+	def recover_directory(self, item):
+		directory_items_list = [ (item.make_full_path(), None) ]
+		for child_item in item.all_items():
+			if child_item.is_deleted():
+				continue
+			if child_item.is_project():
+				directory_items_list += self.recover_directory(child_item)
+			else:
+				directory_items_list.append( (child_item.make_full_path(), child_item.get_next_revision_data()) )
+			continue
+		return directory_items_list
+
+	def apply_to_item_backwards(self, action_item):
+		item = action_item.set_item_deleted(self.item_index)
+		self.assert_valid_item(item)
+
+		if item.item_file is None:
+			self.add_error_string("Project %s could not be recovered: file %s missing"
+					% (self.pathname, self.physical_name))
+			return
+		# Build and save the tree to be recovered.
+		# It can't be done at the time of perform_revision_action call
+		self.tree_list = self.recover_directory(item)
+		return
+
 class destroy_action(named_action):
 
 	def __init__(self, revision:vss_destroy_revision, base_path:str):
 		super().__init__(revision, base_path)
 		self.was_deleted = revision.was_deleted
+		return
+
+	def apply_to_item_backwards(self, action_item):
+		item = action_item.insert_new_item(self.physical_name, self.logical_name,
+						self.project_action, ProjectEntryFlag.Deleted if self.was_deleted else 0,
+						start_timestamp=self.timestamp, item_idx=self.item_index)
+		if item.item_file is None:
+			self.add_error_string("Destroyed item %s could not be reinserted: file %s missing"
+								% (self.pathname, self.physical_name))
 		return
 
 class destroy_project_action(destroy_action):
@@ -150,6 +246,24 @@ class rename_action(named_action):
 		self.original_pathname = base_path + self.original_name
 		return
 
+	def apply_to_item_backwards(self, action_item):
+		# Rename the item back
+		item = action_item.remove_item_by_index(self.item_index, remove_from_directory=True)
+		self.assert_valid_item(item)
+
+		item.logical_name = self.original_name
+		action_item.insert_item_by_idx(item, self.old_item_index)
+
+		if item.item_file is None:
+			self.add_error_string('Rename: physical name %s not present in the database' % (self.physical_name))
+		elif not item.is_deleted():
+			# We need to remove and reinsert the item in the pending list,
+			# because its sort by name position may change among items with same timestamp
+			action_item.remove_pending_item(item)
+			action_item.insert_pending_item(item)
+
+		return
+
 	def __str__(self):
 		return "Rename %s %s to %s" % (self.project_or_file(), self.original_pathname, self.pathname)
 
@@ -168,6 +282,15 @@ class move_from_action(named_action):
 		self.original_pathname = revision.project_path
 		return
 
+	def apply_to_item_backwards(self, action_item):
+		# Applied in reverse, it moves self.physical_name to self.original_pathname
+		item = action_item.remove_item_by_index(self.item_index, remove_from_directory=True)
+		self.assert_valid_item(item)
+
+		if item.item_file is not None:
+			action_item.remove_pending_item(item)
+		return
+
 	def __str__(self):
 		return "Move %s from %s" % (self.pathname, self.original_pathname)
 
@@ -178,6 +301,15 @@ class move_to_action(named_action):
 	def __init__(self, revision:vss_move_revision, base_path:str):
 		super().__init__(revision, base_path)
 		self.new_pathname = revision.project_path
+		return
+
+	def apply_to_item_backwards(self, action_item):
+		# Applied in reverse, it moves self.new_pathname to self.logical_name
+		item = action_item.insert_new_item(self.physical_name, self.logical_name, True, 0,
+				start_timestamp=self.timestamp, item_idx=self.item_index)
+		if item.item_file is None:
+			self.add_error_string("Unable to move item %s: file %s missing"
+								% (self.pathname, self.physical_name))
 		return
 
 	def __str__(self):
@@ -193,6 +325,24 @@ class share_action(named_action):
 		self.data = None
 		return
 
+	def apply_to_item_backwards(self, action_item):
+		# Find context at original path and see what's the revision
+		item = action_item.remove_item_by_index(self.item_index, remove_from_directory=True)
+		self.assert_valid_item(item)
+
+		if item.item_file is None:
+			self.add_error_string("File %s could not be shared: file %s missing"
+								% (self.pathname, self.physical_name))
+			return
+
+		action_item.remove_pending_item(item)
+		self.data = item.get_next_revision_data()
+		# Find out the original file and see if it exists
+		item = action_item.find_by_path_name(self.original_project)
+		if item is None or item.item_file is None:
+			self.original_pathname = None
+		return
+
 	def __str__(self):
 		return "Share %s from %s" % (self.pathname, self.original_project)
 
@@ -205,6 +355,17 @@ class pin_action(named_action):
 		self.data = None
 		return
 
+	def apply_to_item_backwards(self, action_item):
+		item = action_item.unset_item_pinned(self.item_index, self.timestamp)
+		self.assert_valid_item(item)
+
+		if item.item_file is not None:
+			self.data = item.item_file.get_revision_data(self.pinned_revision)
+		else:
+			self.add_error_string("File %s could not be pinned: file %s missing"
+								% (self.pathname, self.physical_name))
+		return
+
 	def __str__(self):
 		return "Pin %s at revision %d" % (self.pathname, self.pinned_revision)
 
@@ -215,6 +376,17 @@ class unpin_action(named_action):
 		super().__init__(revision, base_path)
 		self.unpinned_revision = revision.unpinned_revision
 		self.data = None
+		return
+
+	def apply_to_item_backwards(self, action_item):
+		item = action_item.set_item_pinned(self.item_index, self.unpinned_revision)
+		self.assert_valid_item(item)
+
+		if item.item_file is not None:
+			self.data = item.get_next_revision_data()
+		else:
+			self.add_error_string("File %s could not be unpinned: file %s missing"
+								% (self.pathname, self.physical_name))
 		return
 
 	def __str__(self):
@@ -235,6 +407,20 @@ class branch_file_action(named_action):
 		self.branch_file = revision.source_full_name.physical_name
 		return
 
+	def apply_to_item_backwards(self, action_item):
+		item = action_item.remove_item_by_index(self.item_index, remove_from_directory=True)
+		self.assert_valid_item(item)
+
+		if item.item_file is None:
+			self.add_error_string("File %s could not be branched: file %s missing"
+									% (self.pathname, self.physical_name))
+		new_item = action_item.insert_new_item(self.branch_file, self.logical_name, False,
+						start_timestamp=self.timestamp, item_idx=self.item_index)
+		if new_item.item_file is None:
+			self.add_error_string("Branch source item %s could not be reinserted: file %s missing"
+								% (self.pathname, self.branch_file))
+		return
+
 	def __str__(self):
 		return "Branch File %s from %s" % (self.pathname, self.branch_file)
 
@@ -245,6 +431,10 @@ class create_branch_action(vss_action):
 		super().__init__(revision, base_path)
 		self.branch_file = revision.source_full_name.physical_name
 		self.data = revision.revision_data
+		return
+
+	def apply_to_item_backwards(self, action_item):
+		action_item.next_revision = None
 		return
 
 	def __str__(self):
@@ -279,6 +469,15 @@ class archive_project_action(archive_action):
 	project_action = True
 
 class restore_action(archive_restore_action):
+
+	def apply_to_item_backwards(self, action_item):
+		item = action_item.remove_item_by_index(self.item_index, remove_from_directory=False)
+		self.assert_valid_item(item)
+
+		if item.item_file is None:
+			self.add_error_string("%s %s could not be restored: file %s missing"
+							% (self.Project_or_File(), self.pathname, self.physical_name))
+		return
 
 	def __str__(self):
 		return "Restore %s %s from archive %s" % (self.project_or_file(), self.pathname, self.archive_path)

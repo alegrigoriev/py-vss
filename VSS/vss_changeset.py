@@ -119,6 +119,7 @@ class vss_file_changeset_item(vss_file):
 		else:
 			self.next_revision = None
 		action = create_file_action(revision, base_path + self.logical_name)
+		action.apply_to_item_backwards(self)
 		return action
 
 class vss_directory_changeset_item(vss_project):
@@ -217,6 +218,7 @@ class vss_directory_changeset_item(vss_project):
 				self.next_revision = None
 
 			action = create_project_action(revision, base_path)
+			action.apply_to_item_backwards(self)
 		else:
 			action = item.get_next_revision_action(base_path)
 
