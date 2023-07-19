@@ -33,6 +33,7 @@ def main():
 	parser.add_argument("--verbose", '-V', nargs='+', action='extend',
 					help="""Controls log output.
 Values: 'projects' - print project structure;
+        'tree'     - print tree structure of current database;
         'records'  - print all records of database files;
         'revisions' - print all revisions of every item;""")
 
@@ -51,6 +52,10 @@ Values: 'projects' - print project structure;
 	from VSS.vss_verbose import VerboseFlags
 	verbose_flags = VerboseFlags.Database
 	verbose = options.verbose or ['revisions']
+
+	if 'tree' in verbose:
+		database.print(log_file, verbose=verbose_flags | VerboseFlags.ProjectTree)
+		verbose_flags = 0
 
 	verbose_hex = 'hex' in verbose
 	verbose_records = 'records' in verbose or verbose_hex

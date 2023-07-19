@@ -303,6 +303,24 @@ class vss_project(vss_item):
 		return self.items_by_logical_name.get(logical_name, None)
 
 	def print(self, fd, indent:str='', verbose:VerboseFlags=VerboseFlags.Files|VerboseFlags.FileRevisions):
+		if verbose & VerboseFlags.ProjectTree:
+			child_items = sorted(self.all_items(), key=lambda k:(k.logical_name, k.physical_name))
+
+			if not child_items and self.parent is not None:
+				return
+			print("\n%s%s" % (self.make_full_path(), " (deleted)" if self.is_deleted() else ""), file=fd)
+			# Print child items, files first
+			indent += ' ' * (len(self.logical_name) + 1)
+			for item in child_items:
+				if item.is_project():
+					print("%s%s/%s" % (indent, item.logical_name, " (deleted)" if item.is_deleted() else ""), file=fd)
+				else:
+					print("%s%s%s" % (indent, item.logical_name, " (deleted)" if item.is_deleted() else ""), file=fd)
+			for item in child_items:
+				if item.is_project():
+					item.print(fd, indent, verbose)
+			return
+
 		if verbose & (VerboseFlags.Projects|VerboseFlags.ProjectRevisions|VerboseFlags.DatabaseFiles):
 			print("\n%sProject %s" % (indent, self.make_full_path()), file=fd)
 			super().print(fd, indent+'  ', verbose & ~VerboseFlags.FileRevisions)

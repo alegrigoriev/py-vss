@@ -628,6 +628,9 @@ and supports following command line options:
 `--verbose <verbosity options>`
 - controls log output. The following options are supported:
 
+	`tree`
+	- enables printing of current (top of the history) project tree.
+
 	`projects`
 	- enables printing of all projects' items.
 

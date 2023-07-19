@@ -180,7 +180,7 @@ class vss_database:
 			self.name_file.print(fd, indent, verbose)
 			return
 
-		if verbose & VerboseFlags.Projects:
+		if verbose & (VerboseFlags.Projects|VerboseFlags.ProjectTree):
 			self.get_project_tree().print(fd, indent, verbose)
 
 		return
