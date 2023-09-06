@@ -631,6 +631,10 @@ which is an alias for the current Windows *Multi Byte Character Set* in Python r
 AKA *text encoding for non-Unicode programs*.
 See https://learn.microsoft.com/en-us/windows/win32/intl/code-page-identifiers for more code page IDs.
 
+`--root-project-file <root filename>`
+- root file name. By default, the database root file is AAAAAAAA.
+You can dump the database starting from other directory file, which you can find from the log.
+
 ## File `vss_main.py`
 
 File `vss_main.py` provides a main function to run VSS database analysis from a command line.

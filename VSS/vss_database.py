@@ -45,12 +45,15 @@ class vss_database:
 	ProjectSeparator = "/"
 
 	# Default encoding is the local Windows ANSI code page
-	def __init__(self, path:str, encoding='mbcs'):
+	def __init__(self, path:str, encoding='mbcs', root_project_file=None):
 		self.base_path:str = path
 		self.encoding = encoding
 		self.index_name_dict = {}
 		self.physical_name_dict = {}
 		self.logical_name_dict = {}
+
+		if root_project_file is not None:
+			self.RootProjectFile = root_project_file
 
 		self.ini_path:Path = Path(path, "srcsafe.ini")
 

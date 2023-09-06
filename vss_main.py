@@ -28,13 +28,16 @@ def main():
 	parser.add_argument("--encoding", '-E',
 						help="Database encoding, default: current Windows code page",
 						default='mbcs')
+	parser.add_argument("--root-project-file", '-P',
+				help='Dump from this project file, recursively')
 
 	options = parser.parse_args()
 	log_file = options.log
 
 	print("Loading database", options.database, file=sys.stderr)
 	database = vss_database(options.database,
-							encoding=options.encoding)
+							encoding=options.encoding,
+							root_project_file=options.root_project_file)
 
 	# Preload files
 	database.get_project_tree()
