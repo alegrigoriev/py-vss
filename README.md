@@ -607,3 +607,24 @@ which returns an action object of a specific class for the given `revision`.
 
 This function, defined as `create_project_action(revision, base_path)` is an action factory,
 which returns an action object of a specific class for the given `revision`.
+
+# Command line interface
+
+Although the main use of this package is as a framework, the command line capability
+is provided, for running VSS database analysis.
+
+Command line is invoked by executing `vss_main.py` as:
+
+```
+python vss_main.py <database path> <options>
+```
+
+`vss_main.py` expects the VSS database (repository) directory path as an only argument,
+and supports following command line options:
+
+`--log <log filename>`
+- log file pathname. By default, the log is sent to the standard output.
+
+## File `vss_main.py`
+
+File `vss_main.py` provides a main function to run VSS database analysis from a command line.

@@ -10,6 +10,7 @@
     <OutputPath>.</OutputPath>
     <Name>py-vss</Name>
     <RootNamespace>py-vss</RootNamespace>
+    <StartupFile>vss_main.py</StartupFile>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
     <DebugSymbols>true</DebugSymbols>
@@ -31,6 +32,7 @@
     <Compile Include="VSS\vss_item.py" />
     <Compile Include="VSS\vss_revision.py" />
     <Compile Include="VSS\vss_action.py" />
+    <Compile Include="vss_main.py" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="LICENSE" />
