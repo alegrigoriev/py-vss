@@ -25,12 +25,16 @@ def main():
 	parser.add_argument("--log", '-L', type=argparse.FileType('wt', encoding='utf-8'),
 						help="Log file, default: standard output",
 						default=sys.stdout)
+	parser.add_argument("--encoding", '-E',
+						help="Database encoding, default: current Windows code page",
+						default='mbcs')
 
 	options = parser.parse_args()
 	log_file = options.log
 
 	print("Loading database", options.database, file=sys.stderr)
-	database = vss_database(options.database)
+	database = vss_database(options.database,
+							encoding=options.encoding)
 
 	# Preload files
 	database.get_project_tree()

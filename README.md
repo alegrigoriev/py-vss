@@ -625,6 +625,12 @@ and supports following command line options:
 `--log <log filename>`
 - log file pathname. By default, the log is sent to the standard output.
 
+`--encoding=<encoding>`
+- specifies an encoding (code page) for the database 8 bit text and file names. The default is **mbcs**,
+which is an alias for the current Windows *Multi Byte Character Set* in Python runtime,
+AKA *text encoding for non-Unicode programs*.
+See https://learn.microsoft.com/en-us/windows/win32/intl/code-page-identifiers for more code page IDs.
+
 ## File `vss_main.py`
 
 File `vss_main.py` provides a main function to run VSS database analysis from a command line.
