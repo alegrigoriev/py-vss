@@ -133,6 +133,9 @@ class vss_directory_changeset_item(vss_project):
 		# Initialize the list before the base constructor, as it will be used to load the child items
 		self.pending_child_items:List[Tuple[int, vss_file_changeset_item|vss_directory_changeset_item]] = []
 		self.next_revision:vss_revision = None
+		if logical_name == database.RootProjectName:
+			self.pending_move_to = {}
+			self.pending_move_from = {}
 
 		super().__init__(database, physical_name, logical_name,
 						flags, recursive=recursive)
@@ -280,6 +283,45 @@ class vss_directory_changeset_item(vss_project):
 			item.get_next_revision_action("")
 
 		self.insert_pending_item(item)
+		return item
+
+	# MoveTo and MoveFrom actions come in pairs for a directory move operation.
+	# They can come in either order.
+	def move_from_self(self, item):
+		# Move 'item' from this directory to another. The destination is not known yet
+		root_dir = self
+		while root_dir.parent is not None:
+			root_dir = root_dir.parent
+
+		move_to_item:vss_directory_changeset_item
+		move_to_item, logical_name, item_idx = \
+					root_dir.pending_move_to.pop(item.physical_name, (None, None, 0))
+		if move_to_item is None:
+			root_dir.pending_move_from[item.physical_name] = item
+			return False
+
+		item.logical_name = logical_name
+		move_to_item.insert_item_by_idx(item, item_idx)
+		if item.item_file is not None:
+			move_to_item.insert_pending_item(item)
+		return True
+
+	def move_to_self(self, physical_name, logical_name, item_idx):
+		# Move an item to this directory from another.
+		root_dir = self
+		while root_dir.parent is not None:
+			root_dir = root_dir.parent
+
+		item:vss_directory_changeset_item|vss_file_changeset_item
+		item = root_dir.pending_move_from.pop(physical_name, None)
+		if item is None:
+			root_dir.pending_move_to[physical_name] = self, logical_name, item_idx
+			return None
+
+		item.logical_name = logical_name
+		self.insert_item_by_idx(item, item_idx)
+		if item.item_file is not None:
+			self.insert_pending_item(item)
 		return item
 
 class vss_changeset_history:

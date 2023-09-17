@@ -377,6 +377,9 @@ class move_from_action(named_action):
 
 		if item.item_file is not None:
 			action_item.remove_pending_item(item)
+
+		if not action_item.move_from_self(item):
+			self.perform_revision_action = super().perform_revision_action
 		return
 
 	def perform_revision_action(self, revision_action_handler):
@@ -397,9 +400,10 @@ class move_to_action(named_action):
 
 	def apply_to_item_backwards(self, action_item):
 		# Applied in reverse, it moves self.new_pathname to self.logical_name
-		item = action_item.insert_new_item(self.physical_name, self.logical_name, True, 0,
-				start_timestamp=self.timestamp, item_idx=self.item_index)
-		if item.item_file is None:
+		item = action_item.move_to_self(self.physical_name, self.logical_name, self.item_index)
+		if item is None:
+			self.perform_revision_action = super().perform_revision_action
+		elif item.item_file is None:
 			self.add_error_string("Unable to move item %s: file %s missing"
 								% (self.pathname, self.physical_name))
 		return
