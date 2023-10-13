@@ -149,8 +149,38 @@ class vss_database:
 	def print(self, fd, indent='', verbose=VerboseFlags.AllDatabase):
 		if verbose & VerboseFlags.Database:
 			print(indent+'Database:', self.base_path, file=fd)
+
+		if verbose & VerboseFlags.DatabaseFiles:
+			verbose &= ~(VerboseFlags.Revisions)
+			verbose |= VerboseFlags.Records|VerboseFlags.RecordHeaders
+
+			# The sort order needs to be in the project or file creation timestamp order,
+			# or in alphabetical order for equal timestamp
+			from .vss_item_file import vss_item_file, vss_record_file
+			def sort_function(file:vss_record_file):
+				if isinstance(file, vss_item_file):
+					timestamp_file = file
+				else:
+					# The project directory files don't have a timestamp, so they need to be
+					# associated with their parent file
+					base_name = file.filename.partition('.')[0]
+					timestamp_file = self.record_files_by_physical.get(base_name, None)
+					if not isinstance(timestamp_file, vss_item_file):
+						return (0xFFFFFFFF, file.filename)
+
+				timestamp = timestamp_file.get_creation_timestamp()
+				return (timestamp, file.filename)
+
+			for file in sorted(self.record_files_by_physical.values(),
+							key=sort_function):
+				print("\n%sDatabase file %s" %(indent, file.filename), file=fd)
+				file.print(fd, indent, verbose)
+
+			print("", file=fd)
+			self.name_file.print(fd, indent, verbose)
+			return
+
 		if verbose & VerboseFlags.Projects:
 			self.get_project_tree().print(fd, indent, verbose)
 
-		# TODO: print all files
 		return

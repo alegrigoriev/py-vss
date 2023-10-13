@@ -89,7 +89,9 @@ class vss_item:
 		if verbose & VerboseFlags.FileHeaders:
 			print("%sEntry flags=%s" % (indent, ProjectEntryFlag(self.flags)), file=fd)
 
-		if verbose & (VerboseFlags.ProjectRevisions|VerboseFlags.FileRevisions):
+		if verbose & VerboseFlags.DatabaseFiles:
+			verbose &= ~(VerboseFlags.ProjectRevisions|VerboseFlags.FileRevisions)
+		elif verbose & (VerboseFlags.ProjectRevisions|VerboseFlags.FileRevisions):
 			verbose &= ~VerboseFlags.Records
 		elif not verbose & VerboseFlags.Records:
 			return
@@ -301,7 +303,7 @@ class vss_project(vss_item):
 		return self.items_by_logical_name.get(logical_name, None)
 
 	def print(self, fd, indent:str='', verbose:VerboseFlags=VerboseFlags.Files|VerboseFlags.FileRevisions):
-		if verbose & (VerboseFlags.Projects|VerboseFlags.ProjectRevisions):
+		if verbose & (VerboseFlags.Projects|VerboseFlags.ProjectRevisions|VerboseFlags.DatabaseFiles):
 			print("\n%sProject %s" % (indent, self.make_full_path()), file=fd)
 			super().print(fd, indent+'  ', verbose & ~VerboseFlags.FileRevisions)
 
@@ -310,6 +312,6 @@ class vss_project(vss_item):
 		for item in self.all_items():
 			if item.is_project():
 				item.print(fd, indent, verbose)
-			elif verbose & (VerboseFlags.Files|VerboseFlags.FileRevisions):
+			elif verbose & (VerboseFlags.Files|VerboseFlags.FileRevisions|VerboseFlags.DatabaseFiles):
 				item.print(fd, indent, verbose & ~VerboseFlags.ProjectRevisions)
 		return

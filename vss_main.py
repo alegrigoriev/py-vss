@@ -67,6 +67,13 @@ Values: 'projects' - print project structure;
 		database.print(log_file, verbose=verbose_flags)
 		verbose_flags = 0
 
+	if 'files' in verbose:
+		verbose_flags |= VerboseFlags.DatabaseFiles
+		verbose_flags |= VerboseFlags.Records
+		verbose_flags |= VerboseFlags.Projects|VerboseFlags.Files
+		database.print(log_file, verbose=verbose_flags)
+		verbose_flags = 0
+
 	return 0
 
 if __name__ == "__main__":

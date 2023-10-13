@@ -415,6 +415,9 @@ class vss_project_item_file(vss_item_file):
 		# Projects (directories) don't branch.
 		return self.revisions[version-1]
 
+	def get_creation_timestamp(self):
+		return self.get_revision(1).timestamp
+
 class vss_file_item_file(vss_item_file):
 	# 'first_letter_subdirectory' argument is not used: it's always True.
 	# It's passed as part of generic record file open
@@ -493,6 +496,9 @@ class vss_file_item_file(vss_item_file):
 			# NotImplemented can be returned in case of dependency cycle
 			return None
 		return self.branch_parent.get_revision(version)
+
+	def get_creation_timestamp(self):
+		return self.get_revision(self.header.first_revision).timestamp
 
 	def get_revision_data(self, version:int)->bytes:
 		revision = self.get_revision(version)

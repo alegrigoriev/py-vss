@@ -27,6 +27,7 @@ class VerboseFlags(IntFlag):
 	Projects			= 0x00010000	# Print verbose contents of all projects
 	Files				= 0x00020000	# Print contents of all child file items in the projects
 	HexDump				= 0x00040000	# Print hex dump of all records
+	DatabaseFiles		= 0x00100000	# Print contents of all files
 	Database			= 0x80000000	# Print contents of database, according to other flags
 	Revisions			= ProjectRevisions|FileRevisions
 	AllDatabase			= Database|Projects|Files|ProjectRevisions|FileRevisions
