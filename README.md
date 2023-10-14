@@ -625,6 +625,18 @@ and supports following command line options:
 `--log <log filename>`
 - log file pathname. By default, the log is sent to the standard output.
 
+`--verbose <verbosity options>`
+- controls log output. The following options are supported:
+
+	`projects`
+	- enables printing of all projects' items.
+
+	`records`
+	- enables printing of all records of projects and file items (overrides `projects`).
+
+	`revisions`
+	- enables printing of revisions of project and file items (overrides `projects` and `records`).
+
 `--encoding=<encoding>`
 - specifies an encoding (code page) for the database 8 bit text and file names. The default is **mbcs**,
 which is an alias for the current Windows *Multi Byte Character Set* in Python runtime,

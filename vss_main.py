@@ -30,6 +30,11 @@ def main():
 						default='mbcs')
 	parser.add_argument("--root-project-file", '-P',
 				help='Dump from this project file, recursively')
+	parser.add_argument("--verbose", '-V', nargs='+', action='extend',
+					help="""Controls log output.
+Values: 'projects' - print project structure;
+        'records'  - print all records of database files;
+        'revisions' - print all revisions of every item;""")
 
 	options = parser.parse_args()
 	log_file = options.log
@@ -44,12 +49,21 @@ def main():
 	print("Done", file=sys.stderr)
 
 	from VSS.vss_verbose import VerboseFlags
-	log_verbose = VerboseFlags.Database|VerboseFlags.Projects|VerboseFlags.Files
-	log_verbose |= VerboseFlags.ProjectRevisions|VerboseFlags.FileRevisions
-	log_verbose |= VerboseFlags.Records
-	log_verbose |= VerboseFlags.RecordHeaders|VerboseFlags.FileHeaders
+	verbose_flags = VerboseFlags.Database
+	verbose = options.verbose or ['revisions']
 
-	database.print(log_file, verbose=log_verbose)
+	verbose_records = 'records' in verbose
+	verbose_revisions = 'revisions' in verbose
+	verbose_projects = 'projects' in verbose
+	if verbose_records or verbose_revisions or verbose_projects:
+		verbose_flags |= VerboseFlags.Projects|VerboseFlags.Files
+		if verbose_records:
+			verbose_flags |= VerboseFlags.Records|VerboseFlags.RecordHeaders|VerboseFlags.FileHeaders
+		elif verbose_revisions:
+			verbose_flags |= VerboseFlags.ProjectRevisions|VerboseFlags.FileRevisions
+		database.print(log_file, verbose=verbose_flags)
+		verbose_flags = 0
+
 	return 0
 
 if __name__ == "__main__":
