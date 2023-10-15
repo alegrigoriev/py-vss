@@ -35,7 +35,8 @@ def main():
 Values: 'projects' - print project structure;
         'tree'     - print tree structure of current database;
         'records'  - print all records of database files;
-        'revisions' - print all revisions of every item;""")
+        'revisions' - print all revisions of every item;
+        'changelist' - print the changelist;""")
 
 	options = parser.parse_args()
 	log_file = options.log
@@ -78,6 +79,13 @@ Values: 'projects' - print project structure;
 		verbose_flags |= VerboseFlags.Projects|VerboseFlags.Files
 		database.print(log_file, verbose=verbose_flags)
 		verbose_flags = 0
+
+	if 'changelist' in verbose:
+		print("Building changelist", file=sys.stderr)
+		from VSS.vss_changeset import vss_changeset_history
+		changeset_history = vss_changeset_history(database)
+		changeset_history.print(log_file, verbose=verbose_flags | VerboseFlags.History)
+		print("Done", file=sys.stderr)
 
 	return 0
 

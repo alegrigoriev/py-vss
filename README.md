@@ -706,6 +706,9 @@ and supports following command line options:
 	`files`
 	- enables printing of all file information records of projects and file items.
 
+	`changelist`
+	- enables printing of a generated changelist.
+
 `--encoding=<encoding>`
 - specifies an encoding (code page) for the database 8 bit text and file names. The default is **mbcs**,
 which is an alias for the current Windows *Multi Byte Character Set* in Python runtime,

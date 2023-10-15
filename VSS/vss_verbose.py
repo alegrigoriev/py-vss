@@ -29,6 +29,8 @@ class VerboseFlags(IntFlag):
 	HexDump				= 0x00040000	# Print hex dump of all records
 	DatabaseFiles		= 0x00100000	# Print contents of all files
 	ProjectTree			= 0x00200000	# Print contents of project tree
+	Changesets			= 0x00400000	# Print changesets
 	Database			= 0x80000000	# Print contents of database, according to other flags
 	Revisions			= ProjectRevisions|FileRevisions
 	AllDatabase			= Database|Projects|Files|ProjectRevisions|FileRevisions
+	History				= Changesets|ProjectRevisions|FileRevisions
