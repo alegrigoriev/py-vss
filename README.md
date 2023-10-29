@@ -392,6 +392,53 @@ This class manages project item files, which store directory revisions. It has t
 - returns a vss_revision object for the given version number.
 If the version number is out of bounds, it raises `ArgumentOutOfRangeException` exception.
 
+Methods listed below are used for item position reconstruction.
+The program rebuilds an array of items in a directory by applying changes caused by project revisions,
+from first (oldest) to last (the most recent). Each revision then knows an index of an item which it applies to.
+
+An item in the array is just a `vss_full_name` object, which consists of the item's logical name,
+physical name, indexing name, and long (actual) name.
+
+A logical name is the name by which an item is referred in revisions (as in `vss_name` object).
+In some cases it may be empty.
+
+An indexing name is item's logical name, converted to the locale-specific lowercase,
+in locale-specific multi-byte encoding. Simple byte comparison is used for sort.
+
+A physical name refers to the database file name (8 uppercase letters).
+
+A long name is the actual file name in the checkout tree.
+
+The items' array is sorted by their indexing name.
+Multiple items can have same indexing name, but they will have distinct physical name.
+Items with same indexing name are not sorted by their physical name.
+
+`find_item_index(self, full_name)`
+- Find item index in the sorted array by indexing name and physical name, which are part of `full_name`.
+If an item is not present, the function returns the index of the first element with same or greater logical name,
+which is an insertion point for the new item.
+
+`find_item(self, full_name)`
+- Find item index in the sorted array by indexing name and physical name, which are part of `full_name`.
+If a matching item is not present, return -1.
+
+`remove_item(self, full_name)`
+- remove the item from the sorted array by indexing name and physical name, which are part of `full_name`.
+Returns a tuple of `(item_idx, item)`, or `(item_idx, None)` if the name not found.
+
+`remove_item_by_idx(self, item_idx)`
+- remove the item from the sorted array by index in the array.
+Returns a tuple of `(item_idx, item)`, or `(item_idx, None)` if the index is invalid.
+
+`add_item(self, full_name)`
+- add an item to the sorted array by indexing name and physical name, which are part of `full_name`.
+
+`get_item(self, item_idx)`
+- returns an item by its index in the array.
+
+`def insert_item(self, item_idx, full_name)`
+- insert an item (`full_name`) at the given position.
+
 ### class `vss_file_item_file`
 
 This class manages file item files, which store file revisions. It has the following methods:
@@ -500,6 +547,11 @@ The class defines the following methods:
 
 `__init__(self, record:vss_revision_record, database, item_file:vss_item_file)`
 - class constructor. It can fetch additional records for comment and label comment.
+
+`apply_to_project_items(self, item_file:vss_project_item_file)`
+- the function is invoked for item position reconstruction.
+It normally invokes methods of `item_file`, which is an object of class `vss_project_item_file`,
+and saves the returned item index.
 
 `set_revision_data(self, data:bytes)`
 - sets the data blob for this _file_ revision, and returns the data blob to be used for the preceding revision.

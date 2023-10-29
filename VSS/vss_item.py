@@ -15,6 +15,8 @@
 from __future__ import annotations
 from typing import DefaultDict, Iterator
 
+from .vss_revision import vss_full_name
+
 from .vss_database import vss_database
 from .vss_exception import VssFileNotFoundException
 from .vss_record import vss_record, vss_record_header, vss_name
@@ -185,12 +187,26 @@ class vss_project(vss_item):
 						self.item_file.get_data_file_name(), first_letter_subdirectory=True)
 
 		entry:vss_project_entry_record
+		# Pre-allocate the items array
+		self.items_array = [None] * len(self.item_file.items_array)
+		project_entry_idx = 0
 		for entry in project_entry_file.read_all_records(vss_project_entry_record):
 			assert(entry.is_file_entry() or (entry.is_project_entry() and entry.pinned_version == 0))
-			item:vss_item = self.open_new_item(entry.physical.decode(), self.database.get_long_name(entry.name),
-					entry.is_project_entry(), entry.flags, entry.pinned_version)
+			item_full_name = vss_full_name(database, entry.name, entry.physical)
+			# In some databases (restored from old version?),
+			# order of items after [share A from X, delete A, branch A from Y]
+			# may not match the recovered order.
+			# We need to use the recovered order, since it matches the "share" record indices.
+			item_index = self.item_file.find_item(item_full_name)
+			assert(self.items_array[item_index] is None)
+			if item_index != project_entry_idx:
+				entry.add_annotation("WARNING: Item out of order. Expected at position %d, actual position %d"
+								% (item_index, project_entry_idx))
+			self.items_array.pop(item_index)
+			self.insert_new_item(item_full_name.physical_name, item_full_name.name,
+					entry.is_project_entry(), entry.flags, entry.pinned_version, item_idx=item_index)
 
-			self.insert_item(item)
+			project_entry_idx += 1
 			continue
 		return
 
@@ -205,16 +221,70 @@ class vss_project(vss_item):
 
 		return item
 
+	def insert_new_item(self, physical_name:str, logical_name:str, is_project:bool,
+				flags=0, pinned_version:int=0, item_idx:int=-1):
+		item:vss_item = self.open_new_item(physical_name, logical_name, is_project, flags, pinned_version)
+
+		if item_idx == -1:
+			item_idx = len(self.items_array)
+		self.insert_item_by_idx(item, item_idx)
+		return item
+
+	def remove_item_by_index(self, item_idx, remove_from_directory=False):
+		if item_idx >= len(self.items_array):
+			return None
+		item = self.items_array.pop(item_idx)
+		if not item.is_deleted():
+			if remove_from_directory or item.item_file is None:
+				assert(item is self.items_by_logical_name.get(item.logical_name, None))
+				self.items_by_logical_name.pop(item.logical_name)
+			# If the item file is present, the logical name will be removed by Create action
+		return item
+
 	def remove_from_directory(self, item):
 		return self.items_by_logical_name.pop(item.logical_name)
 
-	def insert_item(self, item):
+	def get_item_by_index(self, item_idx):
+		if item_idx >= len(self.items_array):
+			return None
+		return self.items_array[item_idx]
+
+	def insert_item_by_idx(self, item, item_idx):
+		if item_idx < len(self.items_array) \
+				and self.items_array[item_idx] is item:
+			return item_idx
+
 		item.parent = self
-		self.items_array.append(item)
+		self.items_array.insert(item_idx, item)
 		if not item.is_deleted():
 			assert(item.logical_name not in self.items_by_logical_name)
 			self.items_by_logical_name[item.logical_name] = item
-		return
+		return item_idx
+
+	def find_by_path_name(self, full_name:str):
+		# Find the root project
+		item = self
+		while item.parent is not None:
+			item = item.parent
+
+		full_name = full_name.removesuffix('/')
+		name_parts = full_name.split('/')
+		logical_name = name_parts.pop(0)
+		assert(logical_name == item.logical_name)
+		while name_parts:
+			logical_name = name_parts.pop(0)
+
+			item = item.get_item_by_logical_name(logical_name)
+			if item is None:
+				return None
+			if not item.is_project():
+				break
+			continue
+
+		if name_parts:
+			return None
+
+		return item
 
 	def is_project(self): return True
 

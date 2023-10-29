@@ -37,11 +37,16 @@ class vss_revision:
 			self.comment:str = comment_record.comment
 		else:
 			self.comment:str = None
+		self.item_index:int = None
 		return
 
 	def set_revision_data(self, data:bytes):
 		self.revision_data = data
 		return data
+
+	# This function is called to reconstruct item directory
+	def apply_to_project_items(self, item_file:vss_project_item_file):
+		return
 
 	def print(self, fd):
 		print("  Revision: %d" % (self.revision_num), file=fd)
@@ -116,7 +121,10 @@ class vss_create_file_revision(vss_create_revision):
 	PROJECT_REVISION = False
 
 class vss_add_revision(vss_named_revision):
-	...
+
+	def apply_to_project_items(self, item_file:vss_project_item_file):
+		self.item_index = item_file.add_item(self.full_name)
+		return
 
 class vss_add_project_revision(vss_add_revision):
 	PROJECT_REVISION = True
@@ -125,7 +133,11 @@ class vss_add_file_revision(vss_add_revision):
 	PROJECT_REVISION = False
 
 class vss_delete_revision(vss_named_revision):
-	...
+
+	def apply_to_project_items(self, item_file:vss_project_item_file):
+		self.item_index = item_file.find_item(self.full_name)
+		assert(self.item_index >= 0)
+		return
 
 class vss_delete_project_revision(vss_delete_revision):
 	PROJECT_REVISION = True
@@ -134,7 +146,11 @@ class vss_delete_file_revision(vss_delete_revision):
 	PROJECT_REVISION = False
 
 class vss_recover_revision(vss_named_revision):
-	...
+
+	def apply_to_project_items(self, item_file:vss_project_item_file):
+		self.item_index = item_file.find_item(self.full_name)
+		assert(self.item_index >= 0)
+		return
 
 class vss_recover_project_revision(vss_recover_revision):
 	PROJECT_REVISION = True
@@ -156,6 +172,11 @@ class vss_destroy_revision(vss_named_revision):
 			print("  Previously deleted", file=fd)
 		return
 
+	def apply_to_project_items(self, item_file:vss_project_item_file):
+		self.item_index, item = item_file.remove_item(self.full_name)
+		assert(item is not None and self.item_index >= 0)
+		return
+
 class vss_destroy_project_revision(vss_destroy_revision):
 	PROJECT_REVISION = True
 
@@ -166,6 +187,12 @@ class vss_rename_revision(vss_named_revision):
 	def __init__(self, record:vss_rename_revision_record, database, item_file:vss_project_item_file):
 		super().__init__(record, database, item_file)
 		self.old_full_name = vss_full_name(database, record.old_name, record.physical)
+		return
+
+	def apply_to_project_items(self, item_file:vss_project_item_file):
+		self.old_item_index, item = item_file.remove_item(self.old_full_name)
+		assert(item is not None and self.old_item_index >= 0)
+		self.item_index = item_file.add_item(self.full_name)
 		return
 
 	def print(self, fd):
@@ -190,6 +217,10 @@ class vss_move_revision(vss_named_revision):
 
 class vss_move_from_revision(vss_move_revision):
 
+	def apply_to_project_items(self, item_file:vss_project_item_file):
+		self.item_index = item_file.add_item(self.full_name)
+		return
+
 	def print(self, fd):
 		super().print(fd)
 
@@ -197,6 +228,11 @@ class vss_move_from_revision(vss_move_revision):
 		return
 
 class vss_move_to_revision(vss_move_revision):
+
+	def apply_to_project_items(self, item_file:vss_project_item_file):
+		self.item_index, item = item_file.remove_item(self.full_name)
+		assert(item is not None and self.item_index >= 0)
+		return
 
 	def print(self, fd):
 		super().print(fd)
@@ -213,6 +249,15 @@ class vss_share_revision(vss_named_revision):
 		self.item_index = record.project_idx
 		self.pinned_revision = record.pinned_revision
 		self.unpinned_revision = record.unpinned_revision
+		return
+
+	def apply_to_project_items(self, item_file:vss_project_item_file):
+		if self.unpinned_revision < 0:
+			item_file.insert_item(self.item_index, self.full_name)
+		else:
+			# Pin or unpin file
+			item = item_file.get_item(self.item_index)
+			assert(item is not None and item.physical_name == self.full_name.physical_name)
 		return
 
 	def print(self, fd):
@@ -269,7 +314,13 @@ class vss_create_branch_revision(vss_branch_revision):
 	...
 
 class vss_branch_file_revision(vss_branch_revision):
-	...
+
+	def apply_to_project_items(self, item_file:vss_project_item_file):
+		self.item_index = item_file.find_item(self.source_full_name)
+		assert(self.item_index >= 0)
+		item_file.remove_item_by_idx(self.item_index)
+		item_file.insert_item(self.item_index, self.full_name)
+		return
 
 class vss_archive_restore_revision(vss_named_revision):
 
@@ -294,7 +345,10 @@ class vss_archive_project_revision(vss_archive_revision):
 	PROJECT_REVISION = True
 
 class vss_restore_revision(vss_archive_restore_revision):
-	...
+
+	def apply_to_project_items(self, item_file:vss_project_item_file):
+		self.item_index = item_file.add_item(self.full_name)
+		return
 
 class vss_restore_file_revision(vss_restore_revision):
 	PROJECT_REVISION = False

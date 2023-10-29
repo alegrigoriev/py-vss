@@ -301,6 +301,7 @@ class vss_project_item_file(vss_item_file):
 		super().__init__(database, filename, vss_project_header_record)
 		self.header:vss_project_header_record
 
+		self.items_array = []
 		self.build_revisions(database)
 		return
 
@@ -323,7 +324,82 @@ class vss_project_item_file(vss_item_file):
 			# Continue from the new position
 			offset = record.prev_rev_offset
 			continue
+
+		# Need to pre-process revisions in forward order to assign indices to items
+		for revision in self.revisions:
+			revision.apply_to_project_items(self)
 		return
+
+	def find_item(self, full_name):
+		item_idx = self.find_item_index(full_name)
+		if item_idx >= len(self.items_array):
+			return -1
+		item = self.items_array[item_idx]
+		if item.index_name == full_name.index_name \
+				and item.physical_name == full_name.physical_name:
+			return item_idx
+		return -1
+
+	### Finds either the item index, or the insertion point for the new item
+	def find_item_index(self, full_name):
+		top = len(self.items_array)
+		bottom = 0
+		middle = 0
+		# Search by bisection. Find an index of last item less than we're looking for
+		while bottom != top:
+			middle = (bottom + top + 1) // 2
+			if full_name.index_name > self.items_array[middle-1].index_name:
+				bottom = middle
+				continue
+			elif top == middle:
+				# Not found, break out to avoid infinite loop
+				break
+			else:
+				top = middle
+			continue
+
+		# There can be Multiple items with same index name can.
+		# They're not sorted by physical name.
+		# They're inserted at index 0.
+		top = len(self.items_array)
+		middle = bottom
+		while middle < top:
+			item = self.items_array[middle]
+			if item.index_name != full_name.index_name:
+				break
+			if item.physical_name == full_name.physical_name:
+				# Found
+				return middle
+			middle += 1
+			continue
+		return bottom
+
+	def remove_item(self, full_name):
+		item_idx = self.find_item(full_name)
+		if item_idx >= 0 and item_idx < len(self.items_array):
+			return (item_idx, self.items_array.pop(item_idx))
+		else:
+			return (item_idx, None)
+
+	def remove_item_by_idx(self, item_idx):
+		if item_idx >= 0 and item_idx < len(self.items_array):
+			return (item_idx, self.items_array.pop(item_idx))
+		else:
+			return (item_idx, None)
+
+	def add_item(self, full_name):
+		item_idx = self.find_item_index(full_name)
+		self.items_array.insert(item_idx, full_name)
+		return item_idx
+
+	def get_item(self, item_idx):
+		if item_idx >= len(self.items_array):
+			return None
+		return self.items_array[item_idx]
+
+	def insert_item(self, item_idx, full_name):
+		self.items_array.insert(item_idx, full_name)
+		return item_idx
 
 	def get_revision(self, version:int)->vss_revision:
 		if version < 1 or version > self.header.num_revisions:
