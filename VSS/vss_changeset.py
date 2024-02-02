@@ -136,6 +136,8 @@ class vss_directory_changeset_item(vss_project):
 		if logical_name == database.RootProjectName:
 			self.pending_move_to = {}
 			self.pending_move_from = {}
+			self.pending_share_from = {}
+			self.pending_delete_from = {}
 
 		super().__init__(database, physical_name, logical_name,
 						flags, recursive=recursive)
@@ -323,6 +325,56 @@ class vss_directory_changeset_item(vss_project):
 		if item.item_file is not None:
 			self.insert_pending_item(item)
 		return item
+
+	# Share and Delete actions come in pairs for a file move operation.
+	# They can come in either order.
+	def share_from(self, action:share_action, full_path):
+		# Move 'item' from this directory to another. The destination is not known yet
+		root_dir = self
+		while root_dir.parent is not None:
+			root_dir = root_dir.parent
+
+		delete_action = root_dir.pending_delete_from.pop(full_path, None)
+		if delete_action is not None \
+			and delete_action.timestamp - action.timestamp <= 60 \
+			and delete_action.revision.comment == action.revision.comment:
+			return delete_action
+
+		# prune stale items (10 seconds timestamp diff) from the pending share.
+		# Keep in mind the items are processed in reverse timestamp order
+		# First added is first in the list (dict preserves item insertion order in items())
+		for key, share_action in list(root_dir.pending_share_from.items()):
+			if share_action.timestamp - action.timestamp <= 60:
+				break
+			root_dir.pending_share_from.pop(key)
+			continue
+
+		root_dir.pending_share_from[full_path] = action
+		return None
+
+	def delete_from(self, action:delete_file_action, full_path):
+		# Move an item to this directory from another.
+		root_dir = self
+		while root_dir.parent is not None:
+			root_dir = root_dir.parent
+
+		share_action = root_dir.pending_share_from.pop(full_path, None)
+		if share_action is not None \
+			and share_action.timestamp - action.timestamp <= 60 \
+			and share_action.revision.comment == action.revision.comment:
+			return share_action
+
+		# prune stale items (10 seconds timestamp diff) from the pending delete.
+		# Keep in mind the items are processed in reverse timestamp order
+		# First added is first in the list (dict preserves item insertion order in items())
+		for key, delete_action in list(root_dir.pending_delete_from.items()):
+			if delete_action.timestamp - action.timestamp <= 60:
+				break
+			root_dir.pending_delete_from.pop(key)
+			continue
+
+		root_dir.pending_delete_from[full_path] = action
+		return None
 
 class vss_changeset_history:
 	def __init__(self, database:vss_database):

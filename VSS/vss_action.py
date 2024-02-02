@@ -142,6 +142,14 @@ class delete_item_action(named_action):
 					(self.Project_or_File(), self.pathname, self.physical_name))
 			if not self.project_action:
 				self.perform_revision_action = super().perform_revision_action
+		elif not self.project_action:
+			# Handle share/delete pairs as renames
+			share_action = action_item.delete_from(self, self.pathname)
+			if share_action is not None:
+				share_action.rename_operation = True
+				self.perform_revision_action = super().perform_revision_action
+			else:
+				self.rename_operation = False
 		return
 
 class delete_file_action(delete_item_action):
@@ -150,7 +158,8 @@ class delete_file_action(delete_item_action):
 	project_action = False
 
 	def perform_revision_action(self, revision_action_handler):
-		revision_action_handler.delete_file(path=self.pathname)
+		if not self.rename_operation:
+			revision_action_handler.delete_file(path=self.pathname)
 		return
 
 class delete_project_action(delete_item_action):
@@ -290,6 +299,14 @@ class destroy_action(named_action):
 		elif self.was_deleted:
 			# The directory/file has already been deleted
 			self.perform_revision_action = super().perform_revision_action
+		elif not self.project_action:
+			# Handle share/destroy pairs as renames
+			share_action = action_item.delete_from(self, self.pathname)
+			if share_action is not None:
+				share_action.rename_operation = True
+				self.perform_revision_action = super().perform_revision_action
+			else:
+				self.rename_operation = False
 		return
 
 class destroy_project_action(destroy_action):
@@ -309,7 +326,8 @@ class destroy_file_action(destroy_action):
 
 	def perform_revision_action(self, revision_action_handler):
 		# If the item still t exists, delete it
-		revision_action_handler.delete_file(path=self.pathname)
+		if not self.rename_operation:
+			revision_action_handler.delete_file(path=self.pathname)
 		return
 
 class rename_action(named_action):
@@ -438,14 +456,27 @@ class share_action(named_action):
 
 		action_item.remove_pending_item(item)
 		self.data = item.get_next_revision_data()
-		# Find out the original file and see if it exists
+		# Find out if the original directory exists
 		item = action_item.find_by_path_name(self.original_project)
 		if item is None or item.item_file is None:
+			# Original directory doesn't exist
 			self.original_pathname = None
+			return
+
+		delete_action = action_item.share_from(self, self.original_pathname)
+		if delete_action is not None:
+			delete_action.rename_operation = True
+			self.rename_operation = True
+		else:
+			self.rename_operation = False
+
 		return
 
 	def perform_revision_action(self, revision_action_handler):
-		revision_action_handler.create_file(path=self.pathname, data=self.data, copy_from=self.original_pathname)
+		if self.original_pathname is not None and self.rename_operation:
+			revision_action_handler.rename_file(new_path=self.pathname, old_path=self.original_pathname)
+		else:
+			revision_action_handler.create_file(path=self.pathname, data=self.data, copy_from=self.original_pathname)
 		return
 
 	def __str__(self):
