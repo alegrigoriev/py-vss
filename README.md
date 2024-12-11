@@ -634,6 +634,9 @@ and supports following command line options:
 	`records`
 	- enables printing of all records of projects and file items (overrides `projects`).
 
+	`hex`
+	- prints also raw data of all records in hexadecimal dump (enables `records`).
+
 	`revisions`
 	- enables printing of revisions of project and file items (overrides `projects` and `records`).
 

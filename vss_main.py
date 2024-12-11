@@ -52,13 +52,16 @@ Values: 'projects' - print project structure;
 	verbose_flags = VerboseFlags.Database
 	verbose = options.verbose or ['revisions']
 
-	verbose_records = 'records' in verbose
+	verbose_hex = 'hex' in verbose
+	verbose_records = 'records' in verbose or verbose_hex
 	verbose_revisions = 'revisions' in verbose
 	verbose_projects = 'projects' in verbose
 	if verbose_records or verbose_revisions or verbose_projects:
 		verbose_flags |= VerboseFlags.Projects|VerboseFlags.Files
 		if verbose_records:
 			verbose_flags |= VerboseFlags.Records|VerboseFlags.RecordHeaders|VerboseFlags.FileHeaders
+			if verbose_hex:
+				verbose_flags |= VerboseFlags.HexDump
 		elif verbose_revisions:
 			verbose_flags |= VerboseFlags.ProjectRevisions|VerboseFlags.FileRevisions
 		database.print(log_file, verbose=verbose_flags)

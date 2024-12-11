@@ -294,7 +294,31 @@ class vss_record_header:
 			print_str += " - CRC: %04X (%s: %04X)" % (
 				self.file_crc, "valid" if self.is_crc_valid() else "INVALID", self.actual_crc)
 		print(print_str, file=fd)
+		if verbose & VerboseFlags.HexDump:
+			print_hex(fd, self.reader, indent)
 		return
+
+translate_table=bytes(c if c >= 32 and c < 127 else ord(b'.') for c in range(256))
+
+def print_hex(fd, reader, indent='', start_offset=0, count=None):
+	if count is None:
+		count = reader.length
+
+	offset = start_offset
+	while offset < count:
+		# Printing 16 bytes per line
+		remainder = count-offset
+		if remainder >= 16:
+			data = reader.read_bytes_at(offset, 16)
+		else:
+			data = reader.read_bytes_at(offset, remainder)
+
+		dump_str = "%s %04X: %-48s | %16s |" % (indent, offset, data.hex(' '), data.translate(translate_table).decode(encoding='ascii'))
+		print(dump_str, file=fd)
+
+		offset += 16
+		continue
+	return
 
 class vss_record:
 
